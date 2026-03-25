@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from urllib.parse import unquote, urlparse
+
 import requests
+from requests import RequestException, Session
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ..extensions import db
 from ..models import AppSettings, DetectionCandidate, make_slug
@@ -10,6 +14,24 @@ from ..utils.country_utils import normalize_country_label, normalize_country_key
 
 class DetectionService:
     WIKIDATA_ENDPOINT = 'https://query.wikidata.org/sparql'
+
+    def _build_session(self) -> Session:
+        retry = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            backoff_factor=1.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=frozenset(['GET']),
+            raise_on_status=False,
+        )
+
+        adapter = HTTPAdapter(max_retries=retry)
+
+        session = requests.Session()
+        session.mount('https://', adapter)
+        session.mount('http://', adapter)
+        return session
 
     def __init__(self, settings: AppSettings):
         self.settings = settings
@@ -40,8 +62,8 @@ class DetectionService:
           OPTIONAL {{ ?person wdt:P27 ?country . }}
           OPTIONAL {{ ?person wdt:P345 ?imdb . }}
           OPTIONAL {{
-            ?article schema:about ?person .
-            FILTER(CONTAINS(STR(?article), "wikipedia.org"))
+            ?article schema:about ?person ;
+                     schema:isPartOf <https://en.wikipedia.org/> .
           }}
           OPTIONAL {{ ?person wikibase:sitelinks ?sitelinks . }}
 
@@ -56,16 +78,21 @@ class DetectionService:
 
         headers = {
             'Accept': 'application/sparql-results+json',
-            'User-Agent': 'Memoria/1.0',
+            'User-Agent': 'Memoria/1.0 (+https://github.com/your-repo/memoria)',
         }
 
-        response = requests.get(
-            self.WIKIDATA_ENDPOINT,
-            params={'format': 'json', 'query': query},
-            headers=headers,
-            timeout=20,
-        )
-        response.raise_for_status()
+        session = self._build_session()
+
+        try:
+            response = session.get(
+                self.WIKIDATA_ENDPOINT,
+                params={'format': 'json', 'query': query},
+                headers=headers,
+                timeout=(10, 60),
+            )
+            response.raise_for_status()
+        except RequestException as exc:
+            raise RuntimeError(f'Wikidata query failed: {exc}') from exc
 
         bindings = response.json().get('results', {}).get('bindings', [])
         rows = []
