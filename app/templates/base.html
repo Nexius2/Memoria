@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memoria</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-emerald-950 text-emerald-50 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="mb-6">
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div class="text-sm uppercase tracking-[0.35em] text-emerald-300/70">Tribute collections</div>
+          <h1 class="text-3xl font-bold text-white">Memoria</h1>
+        </div>
+        <nav class="flex flex-wrap gap-2 text-sm">
+          <a class="nav-pill" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+          <a class="nav-pill" href="{{ url_for('main.jobs') }}">Jobs</a>
+          <a class="nav-pill" href="{{ url_for('main.logs') }}">Logs</a>
+          <a class="nav-pill" href="{{ url_for('people.index') }}">People</a>
+          <a class="nav-pill" href="{{ url_for('servers.index') }}">Plex</a>
+          <a class="nav-pill" href="{{ url_for('arr.index') }}">Arr</a>
+          <a class="nav-pill" href="{{ url_for('settings.index') }}">Settings</a>
+        </nav>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-6">
+          {% for category, message in messages %}
+            <div class="rounded-2xl border px-4 py-3 {{ 'border-emerald-400/30 bg-emerald-500/10' if category == 'success' else 'border-amber-400/30 bg-amber-500/10' if category == 'warning' else 'border-rose-400/30 bg-rose-500/10' }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Global confirm modal -->
+  <div
+    id="confirm-modal"
+    class="hidden fixed inset-0 z-50"
+    aria-hidden="true"
+  >
+  <div class="absolute inset-0 bg-black/75 backdrop-blur-sm"></div>
+
+  <div class="relative z-10 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-xl overflow-hidden rounded-[28px] border border-emerald-400/10 bg-[rgba(2,6,23,0.92)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+      <div class="px-6 py-6 border-b border-emerald-400/10 bg-gradient-to-r from-rose-500/10 via-transparent to-transparent">
+        <div class="flex items-start gap-4">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 text-2xl">
+            ⚠
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="text-[11px] uppercase tracking-[0.35em] text-rose-300/70">Danger zone</div>
+            <h3 id="confirm-modal-title" class="mt-2 text-2xl font-bold text-white">
+              Confirm deletion
+            </h3>
+            <p class="mt-2 text-sm text-emerald-100/55">
+              This action is immediate and should only be used when you really want to remove data.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-6">
+        <p id="confirm-modal-message" class="text-base leading-7 text-emerald-100/80">
+          Are you sure you want to continue?
+        </p>
+      </div>
+
+      <div class="px-6 py-5 border-t border-emerald-400/10 flex flex-wrap items-center justify-end gap-3">
+        <button
+          type="button"
+          id="confirm-modal-cancel"
+          class="btn-secondary"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          id="confirm-modal-confirm"
+          class="btn-danger"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('confirm-modal');
+      const modalTitle = document.getElementById('confirm-modal-title');
+      const modalMessage = document.getElementById('confirm-modal-message');
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+      const confirmBtn = document.getElementById('confirm-modal-confirm');
+
+      let pendingForm = null;
+
+      const openModal = ({ title, message, confirmText }) => {
+        if (modalTitle) modalTitle.textContent = title || 'Confirm deletion';
+        if (modalMessage) modalMessage.textContent = message || 'Are you sure you want to continue?';
+        if (confirmBtn) confirmBtn.textContent = confirmText || 'Delete';
+
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+      };
+
+      const closeModal = () => {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        pendingForm = null;
+      };
+
+      document.querySelectorAll('.js-confirm-delete-form').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+
+          pendingForm = form;
+
+          openModal({
+            title: form.dataset.confirmTitle || 'Confirm deletion',
+            message: form.dataset.confirmMessage || 'Are you sure you want to continue?',
+            confirmText: form.dataset.confirmButton || 'Delete',
+          });
+        });
+      });
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeModal);
+      }
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          if (pendingForm) {
+            pendingForm.submit();
+          }
+        });
+      }
+
+      if (modal) {
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal || event.target === modal.firstElementChild) {
+            closeModal();
+          }
+        });
+      }
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+          closeModal();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

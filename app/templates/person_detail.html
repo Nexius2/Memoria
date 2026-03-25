@@ -1,0 +1,629 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+  <div class="panel xl:col-span-1">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        {% if person_photo_url %}
+          <div class="mb-4">
+            <img
+              src="{{ person_photo_url }}"
+              alt="{{ person.name }}"
+              class="w-32 h-32 rounded-2xl object-cover border border-emerald-400/10 bg-black/20"
+            >
+          </div>
+        {% endif %}
+
+        <h2 class="text-2xl font-semibold text-white">{{ person.name }}</h2>
+      </div>
+
+      <div class="flex flex-wrap gap-2 justify-end">
+        <form
+          method="post"
+          action="{{ url_for('people.refresh_metadata', person_id=person.id) }}"
+          class="js-background-refresh-form"
+          data-refresh-scope="person-detail"
+        >
+          <button type="submit" class="btn-secondary">Refresh from TMDb</button>
+        </form>
+        {% if settings.tmdb_api_key %}
+          <form
+            method="post"
+            action="{{ url_for('people.rematch_tmdb', person_id=person.id) }}"
+            class="shrink-0"
+          >
+            <button type="submit" class="btn-secondary">
+              {% if person.tmdb_person_id %}Re-match TMDb{% else %}Find TMDb match{% endif %}
+            </button>
+          </form>
+        {% endif %}
+
+
+        <form
+          method="post"
+          action="{{ url_for('people.delete_person', person_id=person.id) }}"
+          class="js-confirm-delete-form shrink-0"
+          data-confirm-title="Delete person"
+          data-confirm-message="Delete {{ person.name }} and all related events/publications?"
+          data-confirm-button="Delete person"
+        >
+          <button type="submit" class="btn-danger">Delete person</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="mt-4 space-y-2 text-sm text-emerald-100/80">
+      <div><span class="text-emerald-300">Death date:</span> {{ person.death_date }}</div>
+      <div><span class="text-emerald-300">Country:</span> {{ person.country or '—' }}</div>
+      <div><span class="text-emerald-300">Professions:</span> {{ ', '.join(person.professions()) or '—' }}</div>
+      <div><span class="text-emerald-300">Source:</span> {{ person.source }}</div>
+      <div>
+        <span class="text-emerald-300">TMDb link:</span>
+        {% if person.tmdb_person_id %}
+          {{ person.tmdb_person_id }}
+          {% if person.tmdb_manual_override %}
+            <span class="ml-2 inline-flex items-center rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-0.5 text-[11px] uppercase tracking-wide text-amber-200">
+              manual override
+            </span>
+          {% endif %}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      {% if person.source_url %}
+        <div>
+          <a class="text-emerald-300 hover:text-white" target="_blank" href="{{ person.source_url }}">Source page</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="space-y-6 xl:col-span-1">
+    <div class="panel">
+      <h3 class="text-xl font-semibold text-white mb-4">Selection control</h3>
+
+      <form method="post" action="{{ url_for('people.selection_settings', person_id=person.id) }}" class="space-y-4">
+        <div>
+          <label class="field-label">Manual priority</label>
+          <input
+            class="field"
+            type="number"
+            name="manual_priority"
+            value="{{ person.manual_priority if person.manual_priority is not none else '' }}"
+            placeholder="Leave empty to use popularity"
+          >
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+            <input type="checkbox" name="is_pinned" value="1" {% if person.is_pinned %}checked{% endif %}>
+            Pin this person
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+            <input type="checkbox" name="exclude_from_auto" value="1" {% if person.exclude_from_auto %}checked{% endif %}>
+            Exclude from auto selection
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Ignore for X days</label>
+            <input class="field" type="number" min="0" name="ignore_days" placeholder="Example: 7">
+          </div>
+
+          <label class="flex items-center gap-2 text-sm text-emerald-100/80 pt-8">
+            <input type="checkbox" name="clear_ignore" value="1">
+            Clear ignore date
+          </label>
+        </div>
+
+        <div class="text-sm text-emerald-200/70">
+          Current ignore_until: {{ person.ignore_until or '—' }}
+        </div>
+
+        <div>
+          <label class="field-label">Selection note</label>
+          <input
+            class="field"
+            type="text"
+            name="selection_note"
+            value="{{ person.selection_note or '' }}"
+            placeholder="Optional internal note"
+          >
+        </div>
+
+        <div>
+          <button class="btn-secondary" type="submit">Save selection settings</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h3 class="text-xl font-semibold text-white mb-4">Merge duplicate</h3>
+      <p class="text-sm text-emerald-200/70 mb-4">
+        Move this person's events and Arr activity to another person, then delete this duplicate.
+      </p>
+
+      <form
+        method="post"
+        action="{{ url_for('people.merge_into', person_id=person.id) }}"
+        class="space-y-4 js-confirm-delete-form"
+        data-confirm-title="Merge duplicate"
+        data-confirm-message="Merge {{ person.name|e }} into the target person? This will move events and Arr activity, then delete this duplicate."
+        data-confirm-button="Merge person"
+      >
+        <div>
+          <label class="field-label">Target person ID</label>
+          <input
+            class="field"
+            type="number"
+            min="1"
+            name="target_person_id"
+            required
+            placeholder="Example: 12"
+          >
+        </div>
+
+        <button type="submit" class="btn-danger w-full">Merge into target</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel xl:col-span-1">
+    <h3 class="text-xl font-semibold text-white mb-4">Trigger tribute event</h3>
+
+    <form
+      method="post"
+      action="{{ url_for('people.trigger', person_id=person.id) }}"
+      class="grid grid-cols-1 md:grid-cols-3 gap-4 js-background-refresh-form"
+      data-refresh-scope="person-detail"
+    >
+      <div>
+        <label class="field-label">Display days *</label>
+        <input class="field" type="number" min="1" name="display_days" value="{{ settings.display_days }}" required>
+      </div>
+
+      <div>
+        <label class="field-label">Media mode *</label>
+        <select class="field" name="media_mode">
+          <option value="both">Both</option>
+          <option value="movie">Movies only</option>
+          <option value="show">Shows only</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Note</label>
+        <input class="field" type="text" name="note">
+      </div>
+
+      <div class="md:col-span-3">
+        <button class="btn-primary">Create / retrigger</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="panel mb-6">
+  <h3 class="text-xl font-semibold text-white mb-4">Events</h3>
+
+  <div class="space-y-4">
+    {% for event in person.events|sort(attribute='created_at', reverse=True) %}
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="status {{ event.status }}">{{ event.status }}</span>
+              <span class="text-sm text-emerald-200/70">{{ event.start_date }} → {{ event.end_date }}</span>
+            </div>
+
+            <div class="mt-2 text-sm text-emerald-100/80">
+              Mode: {{ event.media_mode }} · Remaining: {{ event.days_remaining }}
+            </div>
+
+            {% if event.note %}
+              <div class="mt-2 text-sm text-emerald-200/60">{{ event.note }}</div>
+            {% endif %}
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <form
+              method="post"
+              action="{{ url_for('people.rebuild_event', event_id=event.id) }}"
+              class="js-background-refresh-form"
+              data-refresh-scope="person-detail"
+            >
+              <button class="btn-secondary">Rebuild</button>
+            </form>
+
+            {% if event.status == 'active' %}
+              <form
+                method="post"
+                action="{{ url_for('people.delete_event', event_id=event.id) }}"
+                class="js-background-refresh-form"
+                data-refresh-scope="person-detail"
+              >
+                <button class="btn-danger">Stop now</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+                <th class="py-2">Server</th>
+                <th class="py-2">Library</th>
+                <th class="py-2">Collection</th>
+                <th class="py-2">Items</th>
+                <th class="py-2">Status</th>
+                <th class="py-2">Message</th>
+                <th class="py-2">Last sync</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for publication in event.publications %}
+                <tr class="border-b border-emerald-400/5">
+                  <td class="py-2">{{ publication.target.plex_server.name }}</td>
+                  <td class="py-2">{{ publication.target.section_name }}</td>
+                  <td class="py-2">{{ publication.collection_title }}</td>
+                  <td class="py-2">{{ publication.media_count }}</td>
+                  <td class="py-2"><span class="status {{ publication.status }}">{{ publication.status }}</span></td>
+                  <td class="py-2 text-emerald-100/70">{{ publication.last_message or '—' }}</td>
+                  <td class="py-2 text-emerald-200/60">
+                    {{ publication.last_synced_at.strftime('%Y-%m-%d %H:%M') if publication.last_synced_at else '—' }}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7" class="py-4 text-center text-emerald-200/60">No publication yet.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="text-sm text-emerald-200/60">No event for this person yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if duplicates %}
+<div class="panel mb-6">
+  <div class="flex items-center justify-between gap-3 mb-4">
+    <div>
+      <h3 class="text-xl font-semibold text-white">Possible duplicates</h3>
+      <p class="text-sm text-emerald-200/70">
+        Strong suggestions are based on external IDs, death date and name similarity.
+      </p>
+    </div>
+  </div>
+
+  <div class="space-y-3">
+    {% for d in duplicates %}
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <a href="{{ url_for('people.detail', person_id=d.person.id) }}" class="text-emerald-300 hover:text-white font-medium">
+                {{ d.person.name }}
+              </a>
+
+              <span class="text-sm text-emerald-100/70">
+                #{{ d.person.id }}
+              </span>
+
+              {% if d.suggest_merge %}
+                <span class="status active">strong match</span>
+              {% endif %}
+            </div>
+
+            <div class="mt-1 text-sm text-emerald-100/70">
+              Similarity: {{ (d.score * 100) | round(0) }}%
+              {% if d.reason %}
+                · {{ d.reason }}
+              {% endif %}
+            </div>
+
+            <div class="mt-1 text-xs text-emerald-200/60">
+              Death: {{ d.person.death_date or '—' }}
+              · Country: {{ d.person.country or '—' }}
+              {% if d.person.tmdb_person_id %}
+                · TMDb: {{ d.person.tmdb_person_id }}
+              {% endif %}
+              {% if d.person.imdb_id %}
+                · IMDb: {{ d.person.imdb_id }}
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <a href="{{ url_for('people.detail', person_id=d.person.id) }}" class="btn-secondary">
+              Open
+            </a>
+
+            <form
+              method="post"
+              action="{{ url_for('people.merge_into', person_id=person.id) }}"
+              class="js-confirm-delete-form"
+              data-confirm-title="Merge duplicate"
+              data-confirm-message="Merge {{ person.name|e }} into {{ d.person.name|e }}?"
+              data-confirm-button="Merge person"
+            >
+              <input type="hidden" name="target_person_id" value="{{ d.person.id }}">
+              <button type="submit" class="btn-danger">
+                Merge into #{{ d.person.id }}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if settings.tmdb_api_key and not person.tmdb_person_id %}
+  <div class="panel mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div>
+        <h3 class="text-xl font-semibold text-white">TMDb candidate resolution</h3>
+        <p class="text-sm text-emerald-200/70">
+          No confident automatic TMDb match was selected. Pick the correct person manually.
+        </p>
+      </div>
+
+      <div class="text-xs text-emerald-200/60">
+        {{ tmdb_candidates|length }} candidate{{ 's' if tmdb_candidates|length != 1 else '' }} shown
+      </div>
+    </div>
+
+    {% if tmdb_candidates %}
+      <div class="space-y-3">
+        {% for candidate in tmdb_candidates %}
+          <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div class="flex gap-4 min-w-0">
+                {% if candidate.profile_image_url %}
+                  <img
+                    src="{{ candidate.profile_image_url }}"
+                    alt="{{ candidate.name }}"
+                    class="w-16 h-16 rounded-xl object-cover border border-emerald-400/10 bg-black/20 shrink-0"
+                  >
+                {% else %}
+                  <div class="w-16 h-16 rounded-xl border border-emerald-400/10 bg-black/20 shrink-0"></div>
+                {% endif %}
+
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="text-white font-medium">{{ candidate.name }}</div>
+                    <span class="text-xs text-emerald-200/60">TMDb #{{ candidate.id }}</span>
+
+                    {% if candidate.match_score is not none %}
+                      <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-sky-500/10 text-sky-200 border border-sky-400/20">
+                        score {{ candidate.match_score }}
+                      </span>
+                    {% endif %}
+                  </div>
+
+                  <div class="mt-1 text-sm text-emerald-100/70">
+                    Death date: {{ candidate.deathday or '—' }}
+                    · Department: {{ candidate.known_for_department or '—' }}
+                    · Popularity: {{ (candidate.match_popularity or 0)|round(1) }}
+                  </div>
+
+                  {% if candidate.also_known_as %}
+                    <div class="mt-2 text-xs text-emerald-200/60 break-words">
+                      Also known as: {{ candidate.also_known_as[:3]|join(', ') }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <form method="post" action="{{ url_for('people.link_tmdb', person_id=person.id) }}" class="shrink-0">
+                <input type="hidden" name="tmdb_person_id" value="{{ candidate.id }}">
+                <button type="submit" class="btn-primary">Use this match</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100/80">
+        TMDb returned no usable candidate for this person yet. You can refresh metadata later after adjusting the person name or country.
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+<div class="panel mb-6">
+  <h3 class="text-xl font-semibold text-white mb-4">Arr activity</h3>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+			<th class="py-2">Date</th>
+			<th class="py-2">Type</th>
+			<th class="py-2">Title</th>
+			<th class="py-2">IDs</th>
+			<th class="py-2">Year</th>
+			<th class="py-2">Server</th>
+			<th class="py-2">Library</th>
+			<th class="py-2">Status</th>
+			<th class="py-2">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for activity in person.arr_activities|sort(attribute='created_at', reverse=True) %}
+          <tr class="border-b border-emerald-400/5">
+            <td class="py-2 text-emerald-100/70">
+              {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+            </td>
+            <td class="py-2">{{ activity.media_kind }}</td>
+			<td class="py-2">{{ activity.title }}</td>
+			<td class="py-2 text-emerald-100/70">
+			  {% if activity.tmdb_id %}<div>TMDb: {{ activity.tmdb_id }}</div>{% endif %}
+			  {% if activity.tvdb_id %}<div>TVDb: {{ activity.tvdb_id }}</div>{% endif %}
+			  {% if not activity.tmdb_id and not activity.tvdb_id %}
+				—
+			  {% endif %}
+			</td>
+			<td class="py-2">{{ activity.year or '—' }}</td>
+			<td class="py-2">{{ activity.arr_server.name if activity.arr_server else '—' }}</td>
+			<td class="py-2">{{ activity.library_target.section_name if activity.library_target else '—' }}</td>
+			<td class="py-2"><span class="status {{ activity.status }}">{{ activity.status }}</span></td>
+			<td class="py-2 text-emerald-100/70 whitespace-pre-wrap break-words">{{ activity.message or '—' }}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="9" class="py-4 text-center text-emerald-200/60">No Arr activity yet.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if tmdb_match or tmdb_credits.cast or tmdb_credits.crew %}
+  <div class="panel mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div>
+        <h3 class="text-xl font-semibold text-white">TMDb context</h3>
+        <p class="text-sm text-emerald-200/70">
+          Used to suggest missing titles and improve matching.
+        </p>
+      </div>
+
+      <form
+        method="post"
+        action="{{ url_for('people.refresh_missing_titles', person_id=person.id) }}"
+        class="js-background-refresh-form"
+        data-refresh-scope="person-detail"
+      >
+        <button type="submit" class="btn-secondary">Refresh missing titles</button>
+      </form>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div>
+        <h4 class="text-lg font-semibold text-white mb-3">Cast / crew sample</h4>
+
+        {% set movie_items = [] %}
+        {% set show_items = [] %}
+
+        {% for item in (tmdb_credits.cast + tmdb_credits.crew) %}
+          {% if item.media_type == 'movie' and movie_items|length < 10 %}
+            {% set _ = movie_items.append(item) %}
+          {% elif item.media_type == 'tv' and show_items|length < 10 %}
+            {% set _ = show_items.append(item) %}
+          {% endif %}
+        {% endfor %}
+
+        <div class="space-y-4 text-sm text-emerald-100/80">
+          <div>
+            <div class="text-sm font-medium text-white mb-2">Movies</div>
+            <div class="space-y-2">
+              {% for item in movie_items %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
+                  {{ item.title or item.name }}
+                  {% set item_date = item.release_date or item.first_air_date %}
+                  {% if item_date %}
+                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="text-emerald-200/60">No movie credit found.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm font-medium text-white mb-2">Shows</div>
+            <div class="space-y-2">
+              {% for item in show_items %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
+                  {{ item.name or item.title }}
+                  {% set item_date = item.first_air_date or item.release_date %}
+                  {% if item_date %}
+                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="text-emerald-200/60">No show credit found.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-lg font-semibold text-white mb-3">
+          Missing titles in enabled Plex libraries
+          <span class="text-sm font-normal text-emerald-200/70">
+            ({{ missing_movies|length }} movies · {{ missing_shows|length }} shows)
+          </span>
+        </h4>
+
+        <div class="text-xs text-emerald-200/60 mb-4">
+          {% if person.missing_titles_status == 'ready' %}
+            Last automatic scan:
+            {{ person.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') if person.missing_titles_scanned_at else '—' }}
+          {% elif person.missing_titles_status == 'error' %}
+            Last scan failed: {{ person.missing_titles_error or 'Unknown error' }}
+          {% elif person.missing_titles_status == 'disabled' %}
+            Automatic scan is disabled or TMDb is not configured.
+          {% else %}
+            Automatic scan has not run yet.
+          {% endif %}
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <div class="text-sm font-medium text-white mb-2">Movies</div>
+            <div class="space-y-2 text-sm text-emerald-100/80">
+              {% for item in missing_movies %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
+                  {{ item.title or item.name }}
+                  {% set item_date = item.release_date or item.first_air_date %}
+                  {% if item_date %}
+                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="text-emerald-200/60">No missing movie found.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm font-medium text-white mb-2">Shows</div>
+            <div class="space-y-2 text-sm text-emerald-100/80">
+              {% for item in missing_shows %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
+                  {{ item.name or item.title }}
+                  {% set item_date = item.first_air_date or item.release_date %}
+                  {% if item_date %}
+                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="text-emerald-200/60">No missing show found.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+
+
+{% endblock %}

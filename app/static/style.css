@@ -1,0 +1,130 @@
+body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.nav-pill {
+  display:inline-flex; align-items:center; justify-content:center; padding:.6rem 1rem; border-radius:999px;
+  background:rgba(16,185,129,.12); border:1px solid rgba(52,211,153,.18); color:#d1fae5;
+}
+.nav-pill:hover { background:rgba(16,185,129,.2); color:white; }
+.panel {
+  border:1px solid rgba(52,211,153,.12); background:rgba(2,6,23,.35); border-radius:1.25rem; padding:1.25rem;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+}
+.label { font-size:.78rem; text-transform:uppercase; letter-spacing:.14em; color:rgba(167,243,208,.7); }
+.value { font-size:1.9rem; font-weight:700; color:white; margin-top:.4rem; }
+.field-label { display:block; margin-bottom:.4rem; color:rgba(209,250,229,.82); font-size:.9rem; }
+.field {
+  width:100%; border-radius:1rem; background:rgba(3,7,18,.55); border:1px solid rgba(52,211,153,.16);
+  padding:.75rem .9rem; color:white;
+}
+.field:focus { outline:none; border-color:rgba(52,211,153,.5); box-shadow:0 0 0 3px rgba(16,185,129,.15); }
+.btn-primary, .btn-secondary, .btn-danger {
+  border-radius:999px; padding:.7rem 1rem; font-weight:600; transition:.15s ease; border:1px solid transparent;
+}
+.btn-primary { background:#10b981; color:#042f2e; }
+.btn-primary:hover { background:#34d399; }
+.btn-secondary { background:rgba(16,185,129,.12); color:#d1fae5; border-color:rgba(52,211,153,.18); }
+.btn-secondary:hover { background:rgba(16,185,129,.22); color:white; }
+.btn-danger {
+  background:linear-gradient(180deg, rgba(244,63,94,.16), rgba(190,24,93,.12));
+  color:#ffe4e6;
+  border-color:rgba(251,113,133,.24);
+  box-shadow:0 8px 24px rgba(190,24,93,.14);
+}
+
+.btn-danger:hover {
+  background:linear-gradient(180deg, rgba(244,63,94,.24), rgba(190,24,93,.18));
+  color:white;
+  box-shadow:0 12px 28px rgba(190,24,93,.22);
+}
+.status {
+  display:inline-flex; border-radius:999px; padding:.25rem .6rem; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+}
+.status.active, .status.synced { background:rgba(16,185,129,.16); color:#a7f3d0; }
+.status.expired, .status.removed { background:rgba(148,163,184,.16); color:#cbd5e1; }
+.status.cancelled, .status.error { background:rgba(244,63,94,.16); color:#fecdd3; }
+.status.missing, .status.pending { background:rgba(245,158,11,.15); color:#fde68a; }
+.filter-pill { padding:.45rem .8rem; border-radius:999px; background:rgba(255,255,255,.05); }
+.filter-pill.active { background:rgba(16,185,129,.16); color:white; }
+.status.info {
+  background: rgba(59,130,246,.16);
+  color: #bfdbfe;
+}
+
+.status.warning {
+  background: rgba(245,158,11,.15);
+  color: #fde68a;
+}
+.status.created {
+  background: rgba(16,185,129,.16);
+  color: #a7f3d0;
+}
+
+.status.already_exists {
+  background: rgba(59,130,246,.16);
+  color: #bfdbfe;
+}
+
+.status.invalid {
+  background: rgba(245,158,11,.15);
+  color: #fde68a;
+}
+
+.table-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: .35rem .9rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  text-align: center;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.table-status-badge--active {
+  background: rgba(16,185,129,.20);
+  color: #a7f3d0;
+  border: 1px solid rgba(52,211,153,.20);
+}
+
+.table-status-badge--candidate {
+  background: rgba(59,130,246,.18);
+  color: #bfdbfe;
+  border: 1px solid rgba(96,165,250,.20);
+}
+
+.table-status-badge--known {
+  background: rgba(245,158,11,.18);
+  color: #fde68a;
+  border: 1px solid rgba(251,191,36,.20);
+}
+
+.icon-reset-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52,211,153,.18);
+  background: rgba(16,185,129,.08);
+  color: rgba(209,250,229,.82);
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: .15s ease;
+  flex-shrink: 0;
+}
+
+.icon-reset-button:hover {
+  background: rgba(16,185,129,.18);
+  color: white;
+}
+
+.btn-secondary--compact,
+.btn-danger--compact {
+  padding: .55rem .9rem;
+  font-size: .92rem;
+}

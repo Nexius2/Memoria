@@ -1,0 +1,342 @@
+from __future__ import annotations
+
+import re
+import unicodedata
+from datetime import datetime
+from difflib import SequenceMatcher
+
+import requests
+
+
+class TmdbService:
+    BASE = 'https://api.themoviedb.org/3'
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def _get(self, path: str, params: dict | None = None):
+        params = params or {}
+        params['api_key'] = self.api_key
+        response = requests.get(f'{self.BASE}{path}', params=params, timeout=30)
+        response.raise_for_status()
+        return response.json()
+
+    def _normalize_name(self, value: str | None) -> str:
+        if not value:
+            return ''
+
+        normalized = unicodedata.normalize('NFKD', value)
+        normalized = ''.join(ch for ch in normalized if not unicodedata.combining(ch))
+        normalized = normalized.casefold().strip()
+        normalized = re.sub(r'[^a-z0-9]+', ' ', normalized)
+        normalized = re.sub(r'\s+', ' ', normalized).strip()
+        return normalized
+
+    def _tokenize_name(self, value: str | None) -> list[str]:
+        normalized = self._normalize_name(value)
+        if not normalized:
+            return []
+        return [token for token in normalized.split(' ') if token]
+
+    def _similarity_ratio(self, left: str, right: str) -> float:
+        if not left or not right:
+            return 0.0
+        return SequenceMatcher(None, left, right).ratio()
+
+    def _extract_year(self, value: str | None) -> int | None:
+        if not value:
+            return None
+
+        try:
+            return datetime.strptime(value[:10], '%Y-%m-%d').year
+        except Exception:
+            return None
+
+    def _extract_date(self, value: str | None) -> str | None:
+        if not value:
+            return None
+
+        value = value.strip()
+        if not value:
+            return None
+
+        try:
+            return datetime.strptime(value[:10], '%Y-%m-%d').strftime('%Y-%m-%d')
+        except Exception:
+            return None
+
+    def _build_search_variants(self, name: str) -> list[str]:
+        variants: list[str] = []
+
+        def add(value: str | None):
+            value = (value or '').strip()
+            if value and value not in variants:
+                variants.append(value)
+
+        original = (name or '').strip()
+        normalized = self._normalize_name(original)
+
+        add(original)
+        add(re.sub(r'\([^)]*\)', ' ', original))
+        add(re.sub(r'\[[^\]]*\]', ' ', original))
+        add(re.sub(r'["“”\'`]+', ' ', original))
+        add(re.sub(r'[^A-Za-z0-9À-ÿ ]+', ' ', original))
+        add(normalized)
+
+        tokens = self._tokenize_name(original)
+        if len(tokens) >= 2:
+            add(' '.join(tokens))
+            add(' '.join(reversed(tokens)))
+
+            if len(tokens) > 2:
+                add(' '.join(tokens[:2]))
+                add(' '.join(tokens[-2:]))
+
+        cleaned_variants = []
+        for variant in variants:
+            cleaned = re.sub(r'\s+', ' ', variant).strip()
+            if cleaned and cleaned not in cleaned_variants:
+                cleaned_variants.append(cleaned)
+
+        return cleaned_variants[:8]
+
+    def _score_name_against_candidate_name(self, query_name: str, candidate_name: str) -> int:
+        normalized_query = self._normalize_name(query_name)
+        normalized_candidate = self._normalize_name(candidate_name)
+
+        if not normalized_query or not normalized_candidate:
+            return -10_000
+
+        score = 0
+
+        if normalized_candidate == normalized_query:
+            score += 260
+        elif normalized_candidate.startswith(normalized_query):
+            score += 160
+        elif normalized_query in normalized_candidate:
+            score += 130
+        elif normalized_candidate in normalized_query:
+            score += 90
+
+        query_tokens = set(self._tokenize_name(query_name))
+        candidate_tokens = set(self._tokenize_name(candidate_name))
+
+        if query_tokens and candidate_tokens:
+            common_tokens = query_tokens & candidate_tokens
+            score += len(common_tokens) * 22
+
+            if query_tokens == candidate_tokens:
+                score += 80
+            elif common_tokens:
+                coverage = len(common_tokens) / max(len(query_tokens), 1)
+                score += int(coverage * 55)
+
+                extra_tokens = candidate_tokens - query_tokens
+                if extra_tokens:
+                    score -= min(len(extra_tokens) * 8, 24)
+            else:
+                score -= 40
+
+        similarity = self._similarity_ratio(normalized_query, normalized_candidate)
+        score += int(similarity * 120)
+
+        if similarity < 0.45:
+            score -= 80
+        elif similarity < 0.60:
+            score -= 30
+
+        return score
+
+    def _score_person_match(
+        self,
+        query_name: str,
+        candidate: dict,
+        *,
+        death_date: str | None = None,
+        details: dict | None = None,
+    ) -> tuple[int, float]:
+        score = 0
+        details = details or {}
+
+        candidate_name = candidate.get('name') or details.get('name') or ''
+        score += self._score_name_against_candidate_name(query_name, candidate_name)
+
+        best_alias_score = 0
+        aliases = candidate.get('also_known_as') or details.get('also_known_as') or []
+        for alias in aliases:
+            alias_score = self._score_name_against_candidate_name(query_name, alias)
+            if alias_score > best_alias_score:
+                best_alias_score = alias_score
+
+        if best_alias_score > 0:
+            score += int(best_alias_score * 0.75)
+
+        known_for_department = (
+            details.get('known_for_department')
+            or candidate.get('known_for_department')
+            or ''
+        ).strip()
+
+        if known_for_department in {'Acting', 'Directing', 'Writing', 'Production', 'Creator'}:
+            score += 10
+
+        popularity = float(candidate.get('popularity') or details.get('popularity') or 0.0)
+        score += min(int(popularity), 25)
+
+        expected_death_date = self._extract_date(death_date)
+        candidate_death_date = self._extract_date(details.get('deathday'))
+
+        if expected_death_date:
+            if candidate_death_date:
+                if candidate_death_date == expected_death_date:
+                    score += 260
+                else:
+                    expected_death_year = self._extract_year(expected_death_date)
+                    candidate_death_year = self._extract_year(candidate_death_date)
+
+                    if (
+                        expected_death_year is not None
+                        and candidate_death_year is not None
+                        and candidate_death_year == expected_death_year
+                    ):
+                        score += 140
+                    else:
+                        score -= 260
+            else:
+                score -= 30
+
+        return (score, popularity)
+
+    def _collect_search_results(self, name: str) -> list[dict]:
+        search_variants = self._build_search_variants(name)
+        aggregated_results: dict[int, dict] = {}
+
+        for variant in search_variants:
+            try:
+                data = self._get('/search/person', {'query': variant, 'include_adult': 'false'})
+            except Exception:
+                continue
+
+            for result in data.get('results') or []:
+                candidate_id = result.get('id')
+                if not candidate_id:
+                    continue
+
+                existing = aggregated_results.get(candidate_id)
+                if existing is None:
+                    aggregated_results[candidate_id] = result
+                    continue
+
+                existing_popularity = float(existing.get('popularity') or 0.0)
+                new_popularity = float(result.get('popularity') or 0.0)
+
+                if new_popularity > existing_popularity:
+                    aggregated_results[candidate_id] = result
+
+        return list(aggregated_results.values())
+
+    def search_person_candidates(
+        self,
+        name: str,
+        *,
+        death_date: str | None = None,
+        limit: int = 5,
+    ) -> list[dict]:
+        results = self._collect_search_results(name)
+        if not results:
+            return []
+
+        initial_ranked = sorted(
+            results,
+            key=lambda candidate: self._score_person_match(name, candidate, death_date=death_date),
+            reverse=True,
+        )
+
+        ranked_candidates: list[dict] = []
+
+        for candidate in initial_ranked[: max(limit, 8)]:
+            details = {}
+            candidate_id = candidate.get('id')
+
+            if candidate_id:
+                try:
+                    details = self.person_details(candidate_id)
+                except Exception:
+                    details = {}
+
+            score_tuple = self._score_person_match(
+                name,
+                candidate,
+                death_date=death_date,
+                details=details,
+            )
+
+            profile_path = (details.get('profile_path') or candidate.get('profile_path') or '').strip()
+
+            ranked_candidate = dict(candidate)
+            ranked_candidate['match_score'] = score_tuple[0]
+            ranked_candidate['match_popularity'] = score_tuple[1]
+            ranked_candidate['deathday'] = self._extract_date(details.get('deathday'))
+            ranked_candidate['known_for_department'] = (
+                details.get('known_for_department')
+                or candidate.get('known_for_department')
+                or ''
+            )
+            ranked_candidate['also_known_as'] = details.get('also_known_as') or []
+            ranked_candidate['profile_image_url'] = (
+                f'https://image.tmdb.org/t/p/w185{profile_path}'
+                if profile_path else None
+            )
+
+            ranked_candidates.append(ranked_candidate)
+
+        ranked_candidates.sort(
+            key=lambda item: (
+                item.get('match_score') or -10_000,
+                item.get('match_popularity') or 0.0,
+            ),
+            reverse=True,
+        )
+
+        return ranked_candidates[: max(limit, 1)]
+
+    def search_person(self, name: str, *, death_date: str | None = None) -> dict | None:
+        reranked = self.search_person_candidates(name, death_date=death_date, limit=8)
+        if not reranked:
+            return None
+
+        best_candidate = reranked[0]
+        best_score_value = int(best_candidate.get('match_score') or -10_000)
+
+        second_score_value = None
+        if len(reranked) > 1:
+            second_score_value = int(reranked[1].get('match_score') or -10_000)
+
+        if best_score_value < 55:
+            return None
+
+        if (
+            second_score_value is not None
+            and not death_date
+            and best_score_value < 140
+            and (best_score_value - second_score_value) < 8
+        ):
+            return None
+
+        return best_candidate
+
+    def person_details(self, person_id: int) -> dict:
+        return self._get(f'/person/{person_id}')
+
+    def person_profile_image_url(self, person_id: int, size: str = 'w780') -> str | None:
+        details = self.person_details(person_id)
+        profile_path = (details.get('profile_path') or '').strip()
+        if not profile_path:
+            return None
+        return f'https://image.tmdb.org/t/p/{size}{profile_path}'
+
+    def person_external_ids(self, person_id: int) -> dict:
+        return self._get(f'/person/{person_id}/external_ids')
+
+    def person_credits(self, person_id: int) -> dict:
+        return self._get(f'/person/{person_id}/combined_credits')

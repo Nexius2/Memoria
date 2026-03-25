@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+  <div
+    id="background-refresh-banner"
+    class="hidden xl:col-span-3 panel text-sm text-emerald-200/80"
+  >
+    Background refresh running… this page will auto-refresh for a short time.
+  </div>
+  <div class="panel">
+    <h2 class="text-xl font-semibold text-white mb-4">Add Plex server</h2>
+    <form method="post" action="{{ url_for('servers.create_server') }}" class="space-y-4">
+      <div>
+        <label class="field-label">Name *</label>
+        <input class="field" type="text" name="name" required>
+      </div>
+
+      <div>
+        <label class="field-label">Base URL *</label>
+        <input class="field" type="text" name="base_url" placeholder="http://plex:32400" required>
+      </div>
+
+      <div>
+        <label class="field-label">Token *</label>
+        <input class="field" type="text" name="token" required>
+      </div>
+
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="verify_ssl"> Verify SSL
+      </label>
+
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="enabled" checked> Enabled
+      </label>
+
+      <button class="btn-primary w-full">Add server</button>
+    </form>
+  </div>
+
+  <div class="xl:col-span-2 space-y-6">
+    <div class="panel text-sm text-emerald-200/70">
+      Enabled libraries keep a cached Plex title index used by the automatic missing titles scan.
+      The cache is refreshed by the scheduler, so people scans do not need to re-read the whole Plex library every time.
+    </div>
+    {% for server in servers %}
+      <div class="panel">
+        <div class="flex flex-wrap gap-3 justify-between items-start">
+          <div>
+            <h3 class="text-xl font-semibold text-white">{{ server.name }}</h3>
+            <div class="text-sm text-emerald-200/60">{{ server.base_url }}</div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 items-center">
+            <form method="post" action="{{ url_for('servers.discover_libraries', server_id=server.id) }}">
+              <button class="btn-secondary" type="submit">Discover libraries</button>
+            </form>
+
+            <form
+              method="post"
+              action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}"
+              class="js-background-refresh-form"
+              data-refresh-scope="servers"
+            >
+              <button class="btn-secondary" type="submit">Refresh Plex cache</button>
+            </form>
+
+			<form
+			  method="post"
+			  action="{{ url_for('servers.delete_server', server_id=server.id) }}"
+			  class="js-confirm-delete-form"
+			  data-confirm-title="Delete Plex server"
+			  data-confirm-message="Are you sure you want to delete the Plex server '{{ server.name }}' ? Its discovered library mappings will also be removed."
+			  data-confirm-button="Delete Plex server"
+			>
+			  <button class="btn-danger" type="submit">Delete</button>
+			</form>
+
+            <button
+              type="button"
+              class="btn-secondary server-toggle"
+              data-target="server-libraries-{{ server.id }}"
+              data-arrow="server-arrow-{{ server.id }}"
+              aria-expanded="false"
+              aria-controls="server-libraries-{{ server.id }}"
+            >
+              <span id="server-arrow-{{ server.id }}">▼</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="server-libraries-{{ server.id }}"
+          class="hidden mt-4 space-y-3"
+        >
+          {% for library in server.libraries %}
+            <form
+              method="post"
+              action="{{ url_for('servers.toggle_library', target_id=library.id) }}"
+              class="library-autosave-form rounded-xl border border-emerald-400/10 bg-black/10 p-4 grid grid-cols-1 md:grid-cols-6 gap-3 items-end"
+            >
+              <input type="hidden" name="_autosave" value="1">
+
+              <div class="md:col-span-2">
+                <div class="text-sm font-semibold text-white">{{ library.section_name }}</div>
+                <div class="text-xs text-emerald-200/60">{{ library.media_type }}</div>
+
+                <div class="mt-2 text-xs">
+                  {% if library.plex_titles_cache_status == 'ready' %}
+                    <div class="text-emerald-300">
+                      Plex cache ready
+                      {% if library.plex_titles_cached_at %}
+                        · {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+                      {% endif %}
+                    </div>
+                  {% elif library.plex_titles_cache_status == 'error' %}
+                    <div class="text-red-300">
+                      Plex cache error
+                      {% if library.plex_titles_cached_at %}
+                        · {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+                      {% endif %}
+                    </div>
+                    {% if library.plex_titles_cache_error %}
+                      <div class="text-red-200/70 mt-1 break-words">
+                        {{ library.plex_titles_cache_error }}
+                      </div>
+                    {% endif %}
+                  {% else %}
+                    <div class="text-emerald-200/60">
+                      Plex cache pending
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="enabled" {% if library.enabled %}checked{% endif %}>
+                Enabled
+              </label>
+
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="publish_on_home" {% if library.publish_on_home %}checked{% endif %}>
+                Home
+              </label>
+
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="publish_on_friends_home" {% if library.publish_on_friends_home %}checked{% endif %}>
+                Friends home
+              </label>
+
+              <div>
+                <label class="field-label">Arr mapping</label>
+                <select class="field" name="arr_server_id">
+                  <option value="">None</option>
+                  {% for arr in arr_servers %}
+                    {% if (library.media_type == 'movie' and arr.kind == 'radarr') or (library.media_type == 'show' and arr.kind == 'sonarr') %}
+                      <option value="{{ arr.id }}" {% if library.arr_server_id == arr.id %}selected{% endif %}>{{ arr.name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+            </form>
+          {% else %}
+            <div class="text-sm text-emerald-200/60">No libraries discovered yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <div class="panel text-sm text-emerald-200/60">No Plex server configured yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const forms = document.querySelectorAll('.library-autosave-form');
+  const backgroundForms = document.querySelectorAll('.js-background-refresh-form');
+  const refreshBanner = document.getElementById('background-refresh-banner');
+  const refreshStorageKey = 'memoriaServersBackgroundRefresh';
+
+  const startAutoRefresh = () => {
+    const expiresAt = Date.now() + 45000;
+    localStorage.setItem(refreshStorageKey, String(expiresAt));
+  };
+
+  const resumeAutoRefreshIfNeeded = () => {
+    const raw = localStorage.getItem(refreshStorageKey);
+    if (!raw) return;
+
+    const expiresAt = Number(raw);
+    if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+      localStorage.removeItem(refreshStorageKey);
+      return;
+    }
+
+    if (refreshBanner) {
+      refreshBanner.classList.remove('hidden');
+    }
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 4000);
+  };
+
+  forms.forEach((form) => {
+    let busy = false;
+
+    const submitForm = async () => {
+      if (busy) return;
+      busy = true;
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (err) {
+        console.error('Autosave failed:', err);
+      } finally {
+        busy = false;
+      }
+    };
+
+    form.querySelectorAll('input[type="checkbox"], select').forEach((field) => {
+      field.addEventListener('change', submitForm);
+    });
+  });
+
+  backgroundForms.forEach((form) => {
+    form.addEventListener('submit', () => {
+      startAutoRefresh();
+    });
+  });
+
+  document.querySelectorAll('.server-toggle').forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.getAttribute('data-target');
+      const arrowId = button.getAttribute('data-arrow');
+
+      const content = document.getElementById(targetId);
+      const arrow = document.getElementById(arrowId);
+
+      if (!content || !arrow) return;
+
+      const isHidden = content.classList.contains('hidden');
+
+      if (isHidden) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+        button.setAttribute('aria-expanded', 'true');
+      } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+        button.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+
+  resumeAutoRefreshIfNeeded();
+});
+</script>
+{% endblock %}

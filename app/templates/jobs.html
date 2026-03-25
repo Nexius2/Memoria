@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="panel mb-6">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-semibold text-white">Job history</h2>
+      <p class="text-sm text-emerald-200/70 mt-1">
+        Review recent detection, sync and expire background jobs.
+      </p>
+    </div>
+
+    <div class="text-xs text-emerald-200/60">
+      {{ job_rows|length }} row{{ 's' if job_rows|length != 1 else '' }} shown
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <form method="get" action="{{ url_for('main.jobs') }}" class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-5">
+    <div>
+      <label class="field-label">Job type</label>
+      <select class="field" name="job_type">
+        <option value="all" {% if job_type == 'all' %}selected{% endif %}>All</option>
+        <option value="detection" {% if job_type == 'detection' %}selected{% endif %}>Detection</option>
+        <option value="sync" {% if job_type == 'sync' %}selected{% endif %}>Sync</option>
+        <option value="expire" {% if job_type == 'expire' %}selected{% endif %}>Expire</option>
+        <option value="cleanup" {% if job_type == 'cleanup' %}selected{% endif %}>Cleanup</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Status</label>
+      <select class="field" name="status">
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="running" {% if status_filter == 'running' %}selected{% endif %}>Running</option>
+        <option value="success" {% if status_filter == 'success' %}selected{% endif %}>Success</option>
+        <option value="error" {% if status_filter == 'error' %}selected{% endif %}>Error</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">From</label>
+      <input type="date" class="field" name="date_from" value="{{ date_from }}">
+    </div>
+
+    <div>
+      <label class="field-label">To</label>
+      <input type="date" class="field" name="date_to" value="{{ date_to }}">
+    </div>
+
+    <div>
+      <label class="field-label">Limit</label>
+      <select class="field" name="limit">
+        <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+
+    <div class="flex items-end gap-3">
+      <button type="submit" class="btn-primary flex-1">Apply</button>
+      <a href="{{ url_for('main.jobs') }}" class="btn-secondary">Reset</a>
+    </div>
+  </form>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+          <th class="py-3 pr-4">Created</th>
+          <th class="py-3 pr-4">Type</th>
+          <th class="py-3 pr-4">Status</th>
+          <th class="py-3 pr-4">Requested by</th>
+          <th class="py-3 pr-4">Window</th>
+          <th class="py-3 pr-4">Duration</th>
+          <th class="py-3 pr-4">Summary</th>
+          <th class="py-3">Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in job_rows %}
+          <tr class="border-b border-emerald-400/5 align-top">
+            <td class="py-3 pr-4 whitespace-nowrap text-emerald-100/80">
+              <div>{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}</div>
+              <div class="text-[11px] text-emerald-200/50">
+                #{{ row.id }}
+              </div>
+            </td>
+
+            <td class="py-3 pr-4">
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide
+                {% if row.job_type == 'detection' %}
+                  bg-sky-500/20 text-sky-200 border border-sky-400/20
+                {% elif row.job_type == 'sync' %}
+                  bg-emerald-500/20 text-emerald-200 border border-emerald-400/20
+                {% else %}
+                  bg-amber-500/20 text-amber-200 border border-amber-400/20
+                {% endif %}">
+                {{ row.job_type }}
+              </span>
+            </td>
+
+            <td class="py-3 pr-4">
+              <span class="status {{ row.status }}">{{ row.status }}</span>
+            </td>
+
+            <td class="py-3 pr-4 text-emerald-100/80">
+              {{ row.requested_by or '—' }}
+            </td>
+
+            <td class="py-3 pr-4 text-emerald-100/70 whitespace-nowrap">
+              <div>
+                <span class="text-emerald-200/50">Start:</span>
+                {{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '—' }}
+              </div>
+              <div>
+                <span class="text-emerald-200/50">End:</span>
+                {{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '—' }}
+              </div>
+            </td>
+
+            <td class="py-3 pr-4 text-emerald-100/80 whitespace-nowrap">
+              {% if row.duration_seconds is not none %}
+                {{ row.duration_seconds }}s
+              {% elif row.status in ['pending', 'running'] %}
+                running...
+              {% else %}
+                —
+              {% endif %}
+            </td>
+
+            <td class="py-3 pr-4 text-white">
+              {{ row.summary }}
+            </td>
+
+            <td class="py-3 text-emerald-100/70">
+              {{ row.details or '—' }}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="8" class="py-8 text-center text-emerald-200/60">
+              No job found for the current filters.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const REFRESH_INTERVAL_MS = 15000;
+  let refreshTimer = null;
+
+  const reloadPage = () => {
+    if (document.hidden) return;
+    window.location.reload();
+  };
+
+  const startRefresh = () => {
+    if (refreshTimer) return;
+    refreshTimer = setInterval(reloadPage, REFRESH_INTERVAL_MS);
+  };
+
+  const stopRefresh = () => {
+    if (!refreshTimer) return;
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopRefresh();
+    } else {
+      startRefresh();
+    }
+  });
+
+  startRefresh();
+});
+</script>
+
+{% endblock %}

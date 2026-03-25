@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Arr Servers{% endblock %}
+{% block header_title %}Arr{% endblock %}
+{% block header_subtitle %}Manage Radarr / Sonarr connections{% endblock %}
+
+{% block content %}
+
+{% set form = arr_form_data or {} %}
+{% set discovery = arr_discovery %}
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+  <div class="panel xl:col-span-1">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Add Arr server</h2>
+        <p class="text-sm text-emerald-200/70 mt-1">
+          Test the API first, then create the server with discovered values.
+        </p>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('arr.create_arr') }}" class="space-y-4">
+      <div>
+        <label class="field-label">Name</label>
+        <input
+          class="field"
+          type="text"
+          name="name"
+          value="{{ form.get('name', '') }}"
+          placeholder="Main Radarr"
+          required
+        >
+      </div>
+
+      <div>
+        <label class="field-label">Type</label>
+        <select class="field" name="kind" required>
+          <option value="radarr" {% if form.get('kind', 'radarr') == 'radarr' %}selected{% endif %}>Radarr</option>
+          <option value="sonarr" {% if form.get('kind') == 'sonarr' %}selected{% endif %}>Sonarr</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Base URL</label>
+        <input
+          class="field"
+          type="text"
+          name="base_url"
+          value="{{ form.get('base_url', '') }}"
+          placeholder="http://192.168.1.10:7878"
+          required
+        >
+      </div>
+
+      <div>
+        <label class="field-label">API key</label>
+        <div class="flex gap-2">
+          <input
+            class="field"
+            type="text"
+            name="api_key"
+            value="{{ form.get('api_key', '') }}"
+            placeholder="xxxxxxxxxxxxxxxx"
+            required
+          >
+          <button
+            type="submit"
+            formaction="{{ url_for('arr.test_fill') }}"
+            class="btn-secondary whitespace-nowrap"
+          >
+            Test &amp; Fill
+          </button>
+        </div>
+      </div>
+
+      {% if discovery %}
+        <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 space-y-3">
+          <div class="text-sm font-medium {% if discovery.ok %}text-emerald-200{% else %}text-rose-200{% endif %}">
+            {{ discovery.message }}
+          </div>
+
+    {% if discovery.checks %}
+      <div class="space-y-1 text-sm text-emerald-100/75">
+        {% for check in discovery.checks %}
+          <div>• {{ check }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+          {% if discovery.ok %}
+            <div class="grid grid-cols-1 gap-3">
+              <div>
+                <label class="field-label">Root folder</label>
+                <select class="field" name="root_folder" required>
+                  {% for root in discovery.root_folders %}
+                    <option
+                      value="{{ root.path }}"
+                      {% if form.get('root_folder') == root.path or (not form.get('root_folder') and loop.first) %}selected{% endif %}
+                    >
+                      {{ root.path }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div>
+                <label class="field-label">Quality profile</label>
+                <select class="field" name="quality_profile_id" required>
+                  {% for profile in discovery.quality_profiles %}
+                    <option
+                      value="{{ profile.id }}"
+                      {% if form.get('quality_profile_id')|string == profile.id|string or (not form.get('quality_profile_id') and loop.first) %}selected{% endif %}
+                    >
+                      {{ profile.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              {% if form.get('kind') == 'sonarr' %}
+                <div>
+                  <label class="field-label">Language profile</label>
+                  <select class="field" name="language_profile_id">
+                    <option value="">None</option>
+                    {% for profile in discovery.language_profiles %}
+                      <option
+                        value="{{ profile.id }}"
+                        {% if form.get('language_profile_id')|string == profile.id|string %}selected{% endif %}
+                      >
+                        {{ profile.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              {% else %}
+                <input type="hidden" name="language_profile_id" value="">
+              {% endif %}
+            </div>
+          {% else %}
+            <input type="hidden" name="root_folder" value="{{ form.get('root_folder', '/') }}">
+            <input type="hidden" name="quality_profile_id" value="{{ form.get('quality_profile_id', '1') }}">
+            <input type="hidden" name="language_profile_id" value="{{ form.get('language_profile_id', '') }}">
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 text-sm text-emerald-200/60">
+          Use <strong>Test &amp; Fill</strong> to validate the connection and load root folder / profile values.
+        </div>
+
+        <input type="hidden" name="root_folder" value="{{ form.get('root_folder', '/') }}">
+        <input type="hidden" name="quality_profile_id" value="{{ form.get('quality_profile_id', '1') }}">
+        <input type="hidden" name="language_profile_id" value="{{ form.get('language_profile_id', '') }}">
+      {% endif %}
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+          <input
+            type="checkbox"
+            name="search_on_add"
+            {% if form.get('search_on_add', True) %}checked{% endif %}
+          >
+          Search on add
+        </label>
+
+        <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+          <input
+            type="checkbox"
+            name="enabled"
+            {% if form.get('enabled', True) %}checked{% endif %}
+          >
+          Enabled
+        </label>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="submit" class="btn-primary flex-1">
+          Create server
+        </button>
+
+        <a href="{{ url_for('arr.index') }}" class="btn-secondary">
+          Reset
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel xl:col-span-2">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Configured Arr servers</h2>
+        <p class="text-sm text-emerald-200/70 mt-1">
+          Current Radarr / Sonarr connections used by Memoria.
+        </p>
+      </div>
+      <div class="text-xs text-emerald-200/60">
+        {{ arr_servers|length }} configured
+      </div>
+    </div>
+
+    {% if arr_servers %}
+      <div class="space-y-4">
+        {% for arr in arr_servers %}
+          <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-5">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="text-lg font-semibold text-white">{{ arr.name }}</div>
+
+                  <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide
+                    {% if arr.kind == 'radarr' %}
+                      bg-sky-500/20 text-sky-200 border border-sky-400/20
+                    {% else %}
+                      bg-violet-500/20 text-violet-200 border border-violet-400/20
+                    {% endif %}">
+                    {{ arr.kind }}
+                  </span>
+
+                  {% if arr.enabled %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-emerald-500/20 text-emerald-200 border border-emerald-400/20">
+                      Enabled
+                    </span>
+                  {% else %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-slate-500/20 text-slate-200 border border-slate-400/20">
+                      Disabled
+                    </span>
+                  {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div class="text-emerald-200/60">Base URL</div>
+                    <div class="text-white break-all">{{ arr.base_url }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-emerald-200/60">Root folder</div>
+                    <div class="text-white break-all">{{ arr.root_folder }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-emerald-200/60">Quality profile ID</div>
+                    <div class="text-white">{{ arr.quality_profile_id }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-emerald-200/60">Language profile ID</div>
+                    <div class="text-white">{{ arr.language_profile_id or '—' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-emerald-200/60">Search on add</div>
+                    <div class="text-white">{{ 'Yes' if arr.search_on_add else 'No' }}</div>
+                  </div>
+
+                  <div>
+                    <div class="text-emerald-200/60">Created</div>
+                    <div class="text-white">
+                      {{ arr.created_at.strftime('%Y-%m-%d %H:%M') if arr.created_at else '—' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-2">
+                <form
+                  method="post"
+                  action="{{ url_for('arr.delete_arr', arr_id=arr.id) }}"
+                  class="js-confirm-delete-form"
+                  data-confirm-title="Delete Arr server"
+                  data-confirm-message="Are you sure you want to delete {{ arr.name|e }}? This only removes the Memoria configuration."
+                  data-confirm-button="Delete server"
+                >
+                  <button type="submit" class="btn-danger">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-8 text-center text-emerald-200/60">
+        No Arr server configured yet.
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<div class="panel mt-6">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+    <div>
+      <h2 class="text-xl font-semibold text-white">Recent Arr activity</h2>
+      <p class="text-sm text-emerald-200/70 mt-1">
+        History of media sent from Memoria to Radarr / Sonarr.
+      </p>
+    </div>
+
+    <div class="text-xs text-emerald-200/60">
+      {{ arr_activities|length }} row{{ 's' if arr_activities|length != 1 else '' }} shown
+    </div>
+  </div>
+
+  <form method="get" action="{{ url_for('arr.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
+    <div>
+      <label class="field-label">Status</label>
+      <select class="field" name="status">
+        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+        <option value="created" {% if status_filter == 'created' %}selected{% endif %}>Created</option>
+        <option value="already_exists" {% if status_filter == 'already_exists' %}selected{% endif %}>Already exists</option>
+        <option value="invalid" {% if status_filter == 'invalid' %}selected{% endif %}>Invalid</option>
+        <option value="error" {% if status_filter == 'error' %}selected{% endif %}>Error</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Server</label>
+      <select class="field" name="server">
+        <option value="all" {% if server_filter == 'all' %}selected{% endif %}>All servers</option>
+        {% for arr in arr_servers %}
+          <option value="{{ arr.id }}" {% if server_filter|string == arr.id|string %}selected{% endif %}>
+            {{ arr.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Type</label>
+      <select class="field" name="media_kind">
+        <option value="all" {% if media_kind_filter == 'all' %}selected{% endif %}>All types</option>
+        <option value="movie" {% if media_kind_filter == 'movie' %}selected{% endif %}>Movie</option>
+        <option value="show" {% if media_kind_filter == 'show' %}selected{% endif %}>Show</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Limit</label>
+      <select class="field" name="limit">
+        <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+
+    <div class="flex items-end gap-3">
+      <button type="submit" class="btn-primary flex-1">Apply</button>
+      <a href="{{ url_for('arr.index') }}" class="btn-secondary">Reset</a>
+    </div>
+  </form>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+          <th class="py-2 pr-4">Date</th>
+          <th class="py-2 pr-4">Person</th>
+          <th class="py-2 pr-4">Type</th>
+          <th class="py-2 pr-4">Title</th>
+          <th class="py-2 pr-4">Year</th>
+          <th class="py-2 pr-4">Server</th>
+          <th class="py-2 pr-4">Library</th>
+          <th class="py-2 pr-4">Status</th>
+          <th class="py-2">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for activity in arr_activities %}
+          <tr class="border-b border-emerald-400/5 align-top">
+            <td class="py-3 pr-4 text-emerald-100/70 whitespace-nowrap">
+              {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+            </td>
+
+            <td class="py-3 pr-4">
+              {% if activity.person %}
+                <a class="text-white hover:text-emerald-200" href="{{ url_for('people.detail', person_id=activity.person.id) }}">
+                  {{ activity.person.name }}
+                </a>
+              {% else %}
+                <span class="text-emerald-100/70">—</span>
+              {% endif %}
+            </td>
+
+            <td class="py-3 pr-4 text-white">{{ activity.media_kind }}</td>
+            <td class="py-3 pr-4 text-white">{{ activity.title }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ activity.year or '—' }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ activity.arr_server.name if activity.arr_server else '—' }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ activity.library_target.section_name if activity.library_target else '—' }}</td>
+            <td class="py-3 pr-4">
+              <span class="status {{ activity.status }}">{{ activity.status }}</span>
+            </td>
+            <td class="py-3 text-emerald-100/70">
+              {{ activity.message or '—' }}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="9" class="py-6 text-center text-emerald-200/60">
+              No Arr activity found for the current filters.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

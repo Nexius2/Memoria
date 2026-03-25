@@ -1,0 +1,541 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="panel lg:col-span-1">
+    <h2 class="text-xl font-semibold text-white mb-4">Add a person manually</h2>
+    <form method="post" action="{{ url_for('people.create_person') }}" class="space-y-4">
+      <div><label class="field-label">Name *</label><input class="field" type="text" name="name" required></div>
+      <div><label class="field-label">Death date *</label><input class="field" type="date" name="death_date" required></div>
+      <div><label class="field-label">Country</label><input class="field" type="text" name="country"></div>
+      <div><label class="field-label">Professions</label><input class="field" type="text" name="professions_csv" placeholder="actor,director"></div>
+      <div><label class="field-label">Notes</label><textarea class="field min-h-28" name="notes"></textarea></div>
+      <button class="btn-primary w-full">Create person</button>
+    </form>
+  </div>
+
+  <div class="panel lg:col-span-2">
+    {% if duplicate_groups %}
+      <div class="mb-6 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Potential duplicates</h3>
+            <p class="text-sm text-amber-100/80 mt-1">
+              Review these people before the database gets messy.
+            </p>
+          </div>
+          <div class="text-xs text-amber-100/70">
+            {{ duplicate_groups|length }} group{{ 's' if duplicate_groups|length != 1 else '' }}
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          {% for group in duplicate_groups %}
+            <div class="rounded-xl border border-amber-400/15 bg-black/10 p-3">
+              <div class="text-xs uppercase tracking-wide text-amber-200/80 mb-2">
+                {{ group.reason }}
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                {% for duplicate_person in group.people %}
+                  <a
+                    href="{{ url_for('people.detail', person_id=duplicate_person.id) }}"
+                    class="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-500/10 px-3 py-1 text-sm text-white hover:bg-amber-500/20"
+                  >
+                    <span class="font-medium">{{ duplicate_person.name }}</span>
+                    <span class="text-amber-100/70">#{{ duplicate_person.id }}</span>
+                    <span class="text-amber-100/70">{{ duplicate_person.death_date or '—' }}</span>
+                    <span class="text-amber-100/70">{{ duplicate_person.source or '—' }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="flex flex-col gap-4 mb-4">
+      <div class="flex items-center justify-between gap-4">
+        <h2 class="text-xl font-semibold text-white">Known people</h2>
+        <div class="text-xs text-emerald-200/60">{{ person_rows|length }} shown</div>
+      </div>
+
+      <form
+        id="people-filters-form"
+        method="get"
+        action="{{ url_for('people.index') }}"
+        class="space-y-3"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="grid flex-1 grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="md:col-span-2">
+              <label class="field-label">Search</label>
+              <input
+                id="people-filter-q"
+                class="field"
+                type="text"
+                name="q"
+                value="{{ q or '' }}"
+                placeholder="Name, country, profession, notes..."
+              >
+            </div>
+
+            <div>
+              <label class="field-label">Status</label>
+              <select class="field people-auto-submit" name="status">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="active_event" {% if status_filter == 'active_event' %}selected{% endif %}>Active event</option>
+                <option value="candidate" {% if status_filter == 'candidate' %}selected{% endif %}>Candidate</option>
+                <option value="known_person" {% if status_filter == 'known_person' %}selected{% endif %}>Known person</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="field-label">Source</label>
+              <select class="field people-auto-submit" name="source">
+                <option value="all" {% if source_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="manual" {% if source_filter == 'manual' %}selected{% endif %}>Manual</option>
+                <option value="web" {% if source_filter == 'web' %}selected{% endif %}>Web</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="field-label">Missing titles</label>
+              <select class="field people-auto-submit" name="missing">
+                <option value="all" {% if missing_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="with_missing" {% if missing_filter == 'with_missing' %}selected{% endif %}>With missing titles</option>
+                <option value="scan_error" {% if missing_filter == 'scan_error' %}selected{% endif %}>Scan error</option>
+                <option value="pending" {% if missing_filter == 'pending' %}selected{% endif %}>Pending scan</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="field-label">Sort</label>
+              <select class="field people-auto-submit" name="sort">
+                <option value="death_desc" {% if sort_by == 'death_desc' %}selected{% endif %}>Death date ↓</option>
+                <option value="death_asc" {% if sort_by == 'death_asc' %}selected{% endif %}>Death date ↑</option>
+                <option value="created_desc" {% if sort_by == 'created_desc' %}selected{% endif %}>Created ↓</option>
+                <option value="created_asc" {% if sort_by == 'created_asc' %}selected{% endif %}>Created ↑</option>
+                <option value="priority_desc" {% if sort_by == 'priority_desc' %}selected{% endif %}>Selection priority ↓</option>
+                <option value="missing_desc" {% if sort_by == 'missing_desc' %}selected{% endif %}>Missing titles ↓</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="people-filters-reset"
+            class="icon-reset-button mt-7"
+            title="Reset filters"
+            aria-label="Reset filters"
+          >
+            ×
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <form id="people-bulk-form" method="post" action="{{ url_for('people.bulk_action') }}">
+      <input type="hidden" name="q" value="{{ q or '' }}">
+      <input type="hidden" name="status" value="{{ status_filter }}">
+      <input type="hidden" name="source" value="{{ source_filter }}">
+      <input type="hidden" name="missing" value="{{ missing_filter }}">
+      <input type="hidden" name="sort" value="{{ sort_by }}">
+      <input type="hidden" name="bulk_action" id="bulk-action-input" value="">
+
+      <div class="mb-4 rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div class="text-sm font-semibold text-white">Bulk actions</div>
+            <div class="text-xs text-emerald-200/60">
+              Select one or more people in the table, then apply an action.
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='pin'">
+              Pin
+            </button>
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='unpin'">
+              Unpin
+            </button>
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='exclude'">
+              Exclude
+            </button>
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='unexclude'">
+              Unexclude
+            </button>
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='ignore_30'">
+              Ignore 30d
+            </button>
+            <button type="submit" class="btn-secondary btn-secondary--compact" onclick="document.getElementById('bulk-action-input').value='clear_ignore'">
+              Clear ignore
+            </button>
+            <button type="button" id="bulk-delete-button" class="btn-danger btn-danger--compact">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+          <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+            <th class="py-3 pr-3 w-10">
+              <input id="select-all-people" type="checkbox">
+            </th>
+            <th class="py-3">Name</th>
+            <th class="py-3">Death date</th>
+            <th class="py-3">Country</th>
+            <th class="py-3">Source</th>
+            <th class="py-3">Missing titles</th>
+            <th class="py-3">In event</th>
+            <th class="py-3">Days left</th>
+            <th class="py-3">Status</th>
+            <th class="py-3 text-right">Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for row in person_rows %}
+            {% set person = row.person %}
+            <tr class="border-b border-emerald-400/5 align-top">
+              <td class="py-3 pr-3">
+                <input class="people-checkbox" type="checkbox" name="person_ids" value="{{ person.id }}">
+              </td>
+
+              <td class="py-3">
+                <a class="text-white hover:text-emerald-300 font-semibold" href="{{ url_for('people.detail', person_id=person.id) }}">
+                  {{ person.name }}
+                </a>
+
+                <div class="mt-2 flex flex-wrap gap-2">
+                  {% if row.status == 'active_event' %}
+                    <span class="table-status-badge table-status-badge--active">
+                      Active event
+                    </span>
+                  {% elif row.status == 'candidate' %}
+                    <span class="table-status-badge table-status-badge--candidate">
+                      Candidate
+                    </span>
+                  {% else %}
+                    <span class="table-status-badge table-status-badge--known">
+                      Known person
+                    </span>
+                  {% endif %}
+
+                  {% if row.is_pinned %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-violet-500/20 text-violet-200 border border-violet-400/20">
+                      Pinned
+                    </span>
+                  {% endif %}
+
+                  {% if row.is_excluded %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-rose-500/20 text-rose-200 border border-rose-400/20">
+                      Excluded
+                    </span>
+                  {% endif %}
+
+                  {% if row.is_ignored %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-slate-500/20 text-slate-200 border border-slate-400/20">
+                      Ignored
+                    </span>
+                  {% endif %}
+
+                  {% if row.manual_priority is not none %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-orange-500/20 text-orange-200 border border-orange-400/20">
+                      Priority {{ row.manual_priority }}
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <td class="py-3">{{ person.death_date }}</td>
+              <td class="py-3">{{ person.country or '—' }}</td>
+              <td class="py-3">{{ person.source }}</td>
+
+              <td class="py-3">
+                <div class="flex flex-col gap-2">
+                  <div class="flex flex-wrap gap-2">
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-cyan-500/20 text-cyan-200 border border-cyan-400/20">
+                      {{ row.missing_movies_count }} movies
+                    </span>
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-indigo-500/20 text-indigo-200 border border-indigo-400/20">
+                      {{ row.missing_shows_count }} shows
+                    </span>
+                  </div>
+
+                  <div class="text-xs">
+                    {% if row.missing_titles_status == 'ready' %}
+                      <div class="text-emerald-200/80">
+                        Scan ready
+                        {% if row.missing_titles_scanned_at %}
+                          · {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% endif %}
+                      </div>
+                    {% elif row.missing_titles_status == 'error' %}
+                      <div class="text-red-200/80">
+                        Scan error
+                      </div>
+                      {% if row.missing_titles_error %}
+                        <div class="text-red-200/60 mt-1">
+                          {{ row.missing_titles_error }}
+                        </div>
+                      {% endif %}
+                    {% elif row.missing_titles_status == 'disabled' %}
+                      <div class="text-amber-200/80">
+                        Scan disabled
+                      </div>
+                    {% else %}
+                      <div class="text-emerald-100/60">
+                        Scan pending
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+
+              <td class="py-3">
+                {% if row.active_event %}
+                  <div class="text-emerald-100/80">{{ row.in_event_label }}</div>
+                {% else %}
+                  <div class="text-emerald-100/60">—</div>
+                {% endif %}
+              </td>
+
+              <td class="py-3">
+                {% if row.days_left is not none %}
+                  <span class="text-white">{{ row.days_left }}</span>
+                {% else %}
+                  <span class="text-emerald-100/60">—</span>
+                {% endif %}
+              </td>
+
+              <td class="py-3">
+                {% if row.active_event %}
+                  <div class="text-emerald-100/80">
+                    Active until {{ row.active_event.end_date }}
+                  </div>
+                {% elif person.ignore_until %}
+                  <div class="text-emerald-100/80">
+                    Ignored until {{ person.ignore_until }}
+                  </div>
+                {% else %}
+                  <div class="text-emerald-100/60">—</div>
+                {% endif %}
+              </td>
+
+              <td class="py-3 text-right">
+                <div class="flex justify-end gap-2">
+                  <a
+                    href="{{ url_for('people.detail', person_id=person.id) }}"
+                    class="btn-secondary"
+                  >
+                    Open
+                  </a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="10" class="py-8 text-center text-emerald-200/60">
+                No people match the current filters.
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const selectAll = document.getElementById('select-all-people');
+    const checkboxes = Array.from(document.querySelectorAll('.people-checkbox'));
+    const bulkForm = document.getElementById('people-bulk-form');
+    const bulkActionInput = document.getElementById('bulk-action-input');
+    const bulkDeleteButton = document.getElementById('bulk-delete-button');
+
+    const modal = document.getElementById('confirm-modal');
+    const modalTitle = document.getElementById('confirm-modal-title');
+    const modalMessage = document.getElementById('confirm-modal-message');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+    const confirmBtn = document.getElementById('confirm-modal-confirm');
+
+    const filtersForm = document.getElementById('people-filters-form');
+    const filtersResetButton = document.getElementById('people-filters-reset');
+    const filtersStorageKey = 'memoria.people.filters.v1';
+
+    if (selectAll) {
+      selectAll.addEventListener('change', () => {
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = selectAll.checked;
+        });
+      });
+    }
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        if (!selectAll) return;
+        selectAll.checked = checkboxes.length > 0 && checkboxes.every((item) => item.checked);
+      });
+    });
+
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', (event) => {
+        const checked = checkboxes.filter((checkbox) => checkbox.checked);
+        if (checked.length === 0) {
+          event.preventDefault();
+          alert('Select at least one person.');
+        }
+      });
+    }
+
+    if (filtersForm) {
+      const hasQueryParams = window.location.search && window.location.search.length > 1;
+      const qField = filtersForm.querySelector('[name="q"]');
+      const statusField = filtersForm.querySelector('[name="status"]');
+      const sourceField = filtersForm.querySelector('[name="source"]');
+      const missingField = filtersForm.querySelector('[name="missing"]');
+      const sortField = filtersForm.querySelector('[name="sort"]');
+      const autoSubmitFields = filtersForm.querySelectorAll('.people-auto-submit');
+
+      let searchDebounceTimer = null;
+
+      if (!hasQueryParams) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(filtersStorageKey) || 'null');
+          if (saved) {
+            let shouldSubmit = false;
+
+            if (qField && saved.q !== undefined && qField.value !== saved.q) {
+              qField.value = saved.q;
+              shouldSubmit = true;
+            }
+            if (statusField && saved.status && statusField.value !== saved.status) {
+              statusField.value = saved.status;
+              shouldSubmit = true;
+            }
+            if (sourceField && saved.source && sourceField.value !== saved.source) {
+              sourceField.value = saved.source;
+              shouldSubmit = true;
+            }
+            if (missingField && saved.missing && missingField.value !== saved.missing) {
+              missingField.value = saved.missing;
+              shouldSubmit = true;
+            }
+            if (sortField && saved.sort && sortField.value !== saved.sort) {
+              sortField.value = saved.sort;
+              shouldSubmit = true;
+            }
+
+            if (shouldSubmit) {
+              filtersForm.requestSubmit();
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to restore people filters:', error);
+        }
+      }
+
+      filtersForm.addEventListener('submit', () => {
+        try {
+          localStorage.setItem(filtersStorageKey, JSON.stringify({
+            q: qField ? qField.value : '',
+            status: statusField ? statusField.value : 'all',
+            source: sourceField ? sourceField.value : 'all',
+            missing: missingField ? missingField.value : 'all',
+            sort: sortField ? sortField.value : 'death_desc',
+          }));
+        } catch (error) {
+          console.warn('Failed to save people filters:', error);
+        }
+      });
+
+      autoSubmitFields.forEach((field) => {
+        field.addEventListener('change', () => {
+          filtersForm.requestSubmit();
+        });
+      });
+
+      if (qField) {
+        qField.addEventListener('input', () => {
+          window.clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = window.setTimeout(() => {
+            filtersForm.requestSubmit();
+          }, 350);
+        });
+      }
+
+      if (filtersResetButton) {
+        filtersResetButton.addEventListener('click', () => {
+          try {
+            localStorage.removeItem(filtersStorageKey);
+          } catch (error) {
+            console.warn('Failed to clear people filters:', error);
+          }
+          window.location.href = "{{ url_for('people.index') }}";
+        });
+      }
+    }
+
+    if (bulkDeleteButton && bulkForm && modal && confirmBtn && cancelBtn) {
+      let deletePending = false;
+
+      const openBulkDeleteModal = () => {
+        if (modalTitle) modalTitle.textContent = 'Delete selected people';
+        if (modalMessage) modalMessage.textContent = 'Delete all selected people and all related events/publications?';
+        if (confirmBtn) confirmBtn.textContent = 'Delete selected';
+
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        deletePending = true;
+      };
+
+      const closeBulkDeleteModal = () => {
+        if (!deletePending) return;
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        deletePending = false;
+      };
+
+      bulkDeleteButton.addEventListener('click', () => {
+        const checked = checkboxes.filter((checkbox) => checkbox.checked);
+        if (checked.length === 0) {
+          alert('Select at least one person.');
+          return;
+        }
+        openBulkDeleteModal();
+      });
+
+      confirmBtn.addEventListener('click', () => {
+        if (!deletePending) return;
+        bulkActionInput.value = 'delete';
+        deletePending = false;
+        bulkForm.submit();
+      });
+
+      cancelBtn.addEventListener('click', () => {
+        closeBulkDeleteModal();
+      });
+
+      modal.addEventListener('click', (event) => {
+        if (!deletePending) return;
+        if (event.target === modal || event.target === modal.firstElementChild) {
+          closeBulkDeleteModal();
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (!deletePending) return;
+        if (event.key === 'Escape') {
+          closeBulkDeleteModal();
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

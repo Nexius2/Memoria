@@ -1,0 +1,597 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+  <div class="panel">
+    <div class="label">Active events</div>
+    <div class="value">{{ dashboard_overview.active_events_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Currently visible tribute events</div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Ending in 7 days</div>
+    <div class="value">{{ dashboard_overview.expiring_soon_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Events to watch soon</div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Published targets</div>
+    <div class="value">{{ dashboard_overview.published_targets_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Active event publications</div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Running jobs</div>
+    <div class="value">{{ dashboard_overview.running_jobs_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Detection / sync / expire</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+  <div class="panel xl:col-span-2">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Current settings snapshot</h2>
+        <p class="text-sm text-emerald-200/70">
+          Quick view of the rules currently driving automatic selection.
+        </p>
+      </div>
+      <a class="btn-secondary" href="{{ url_for('settings.index') }}">Open settings</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="label">Auto detection</div>
+        <div class="value text-2xl">{{ 'Enabled' if settings.auto_detection_enabled else 'Disabled' }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="label">Display days</div>
+        <div class="value text-2xl">{{ settings.display_days }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="label">Max people</div>
+        <div class="value text-2xl">{{ settings.max_people }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="label">Cached candidates</div>
+        <div class="value text-2xl">{{ dashboard_overview.cached_candidates_count }}</div>
+      </div>
+    </div>
+
+    <div class="mt-4 text-sm text-emerald-100/80">
+      <span class="text-emerald-300">Countries:</span>
+      {{ settings.countries() | join(', ') if settings.countries() else 'All countries' }}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Top countries</h2>
+        <p class="text-sm text-emerald-200/70">
+          Based on currently active events.
+        </p>
+      </div>
+    </div>
+
+    {% if dashboard_overview.top_countries %}
+      <div class="space-y-3">
+        {% for item in dashboard_overview.top_countries %}
+          <div class="flex items-center justify-between gap-4 rounded-2xl border border-emerald-400/10 bg-black/10 px-4 py-3">
+            <div class="text-white font-medium">{{ item.name }}</div>
+            <div class="text-emerald-200/80 text-sm">{{ item.count }} event{{ 's' if item.count != 1 else '' }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-sm text-emerald-200/60">
+        No country data available on active events yet.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+  <div class="panel xl:col-span-2">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Event status overview</h2>
+        <p class="text-sm text-emerald-200/70">
+          Quick counters for all tribute events.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <a href="{{ url_for('main.dashboard', status='active', view=view, sort=sort_by) }}" class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 hover:bg-black/20">
+        <div class="label">Active</div>
+        <div class="value text-2xl">{{ dashboard_overview.status_counts.active }}</div>
+      </a>
+
+      <a href="{{ url_for('main.dashboard', status='expired', view=view, sort=sort_by) }}" class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 hover:bg-black/20">
+        <div class="label">Expired</div>
+        <div class="value text-2xl">{{ dashboard_overview.status_counts.expired }}</div>
+      </a>
+
+      <a href="{{ url_for('main.dashboard', status='cancelled', view=view, sort=sort_by) }}" class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 hover:bg-black/20">
+        <div class="label">Cancelled</div>
+        <div class="value text-2xl">{{ dashboard_overview.status_counts.cancelled }}</div>
+      </a>
+
+      <a href="{{ url_for('main.dashboard', status='all', view=view, sort=sort_by) }}" class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 hover:bg-black/20">
+        <div class="label">Total</div>
+        <div class="value text-2xl">{{ dashboard_overview.status_counts.all }}</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Problematic events</h2>
+        <p class="text-sm text-emerald-200/70">
+          Active events needing attention.
+        </p>
+      </div>
+      <div class="text-xs text-emerald-200/60">
+        {{ dashboard_overview.problematic_events_count }} total
+      </div>
+    </div>
+
+    {% if dashboard_overview.problematic_events %}
+      <div class="space-y-3">
+        {% for item in dashboard_overview.problematic_events %}
+          {% set event = item.event %}
+          <div class="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <a class="text-white font-medium hover:text-amber-100" href="{{ url_for('people.detail', person_id=event.person_id) }}">
+                  {{ event.person.name }}
+                </a>
+                <div class="mt-1 text-xs text-amber-100/80">
+                  {{ event.start_date }} → {{ event.end_date }}
+                </div>
+              </div>
+              <div class="text-xs text-amber-100/80">
+                {{ event.days_remaining }} day{{ 's' if event.days_remaining != 1 else '' }}
+              </div>
+            </div>
+
+            <div class="mt-2 flex flex-wrap gap-2">
+              {% for reason in item.reasons %}
+                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-100 border border-amber-300/20">
+                  {{ reason }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4">
+        <a class="btn-secondary w-full justify-center" href="{{ url_for('main.dashboard', status='active', view='problematic', sort=sort_by) }}">
+          Show problematic events
+        </a>
+      </div>
+    {% else %}
+      <div class="text-sm text-emerald-200/60">
+        No obvious anomaly on active events.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel mb-6">
+  <div class="flex flex-wrap gap-3 justify-between items-start">
+    <div class="min-w-0">
+      <h2 class="text-xl font-semibold text-white">Live control</h2>
+      <p class="text-sm text-emerald-200/70">
+        Detection, sync and expire now run in background without blocking the UI.
+      </p>
+
+      <div id="detection-job-state" class="mt-3 text-sm text-emerald-100/80">
+        {% if latest_detection_run %}
+          Detection status:
+          <span class="font-semibold">{{ latest_detection_run.status }}</span>
+          {% if latest_detection_run.status == 'success' %}
+            — {{ latest_detection_run.candidates_cached }} cached, {{ latest_detection_run.people_upserted }} people updated, {{ latest_detection_run.events_created }} events created
+          {% elif latest_detection_run.status == 'error' %}
+            — {{ latest_detection_run.error_message or 'Unknown error' }}
+          {% elif latest_detection_run.status in ['pending', 'running'] %}
+            — Detection is running in background...
+          {% endif %}
+        {% else %}
+          Detection status: <span class="font-semibold">idle</span>
+        {% endif %}
+      </div>
+
+      <div id="sync-job-state" class="mt-2 text-sm text-emerald-100/80">
+        {% if latest_sync_run %}
+          Sync status:
+          <span class="font-semibold">{{ latest_sync_run.status }}</span>
+          {% if latest_sync_run.status == 'success' %}
+            — {{ latest_sync_run.message or (latest_sync_run.success_items ~ ' success, ' ~ latest_sync_run.error_items ~ ' error(s).') }}
+          {% elif latest_sync_run.status == 'error' %}
+            — {{ latest_sync_run.message or 'Unknown error' }}
+          {% elif latest_sync_run.status in ['pending', 'running'] %}
+            — {{ latest_sync_run.message or 'Sync is running in background...' }}
+          {% endif %}
+        {% else %}
+          Sync status: <span class="font-semibold">idle</span>
+        {% endif %}
+      </div>
+
+      <div id="expire-job-state" class="mt-2 text-sm text-emerald-100/80">
+        {% if latest_expire_run %}
+          Expire status:
+          <span class="font-semibold">{{ latest_expire_run.status }}</span>
+          {% if latest_expire_run.status == 'success' %}
+            — {{ latest_expire_run.message or (latest_expire_run.success_items ~ ' expired.') }}
+          {% elif latest_expire_run.status == 'error' %}
+            — {{ latest_expire_run.message or 'Unknown error' }}
+          {% elif latest_expire_run.status in ['pending', 'running'] %}
+            — {{ latest_expire_run.message or 'Expire check is running in background...' }}
+          {% endif %}
+        {% else %}
+          Expire status: <span class="font-semibold">idle</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+      <form method="post" action="{{ url_for('main.run_detection') }}">
+        <button class="btn-primary">Run detection</button>
+      </form>
+      <form method="post" action="{{ url_for('main.run_sync') }}">
+        <button class="btn-secondary">Run sync</button>
+      </form>
+      <form method="post" action="{{ url_for('main.run_expire') }}">
+        <button class="btn-secondary">Run expire</button>
+      </form>
+      <a class="btn-secondary" href="{{ url_for('main.jobs') }}">Open history</a>
+    </div>
+  </div>
+</div>
+
+<div class="panel mb-6">
+  <div class="flex items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 class="text-xl font-semibold text-white">Recent web candidates</h2>
+      <p class="text-sm text-emerald-200/70">Cached candidates ordered by popularity, then by death date.</p>
+    </div>
+    <div class="text-xs text-emerald-200/60">{{ candidate_rows|length }} shown</div>
+  </div>
+
+  {% if candidate_rows %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {% for row in candidate_rows %}
+        {% set candidate = row.candidate %}
+        {% set person = row.person %}
+        {% set active_event = row.active_event %}
+        {% set display_name = candidate.name if candidate else person.name %}
+        {% set display_death_date = candidate.death_date if candidate else person.death_date %}
+        {% set display_country = candidate.country if candidate else person.country %}
+        {% set display_popularity = candidate.popularity_score if candidate else none %}
+        {% set display_source_url = candidate.source_url if candidate else person.source_url %}
+
+        <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="text-white font-semibold">{{ display_name }}</div>
+
+            {% if active_event %}
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-emerald-500/20 text-emerald-200 border border-emerald-400/20">
+                Active event
+              </span>
+            {% elif person %}
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-200 border border-amber-400/20">
+                Known person
+              </span>
+            {% else %}
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-slate-500/20 text-slate-200 border border-slate-400/20">
+                Candidate
+              </span>
+            {% endif %}
+          </div>
+
+          <div class="mt-2 text-sm text-emerald-100/80">Death date: {{ display_death_date }}</div>
+          <div class="text-sm text-emerald-100/80">Country: {{ display_country or '—' }}</div>
+
+          {% if display_popularity is not none %}
+            <div class="text-sm text-emerald-100/80">Popularity: {{ display_popularity }}</div>
+          {% else %}
+            <div class="text-sm text-emerald-100/60">Popularity: —</div>
+          {% endif %}
+
+          {% if person %}
+            <div class="mt-2 flex flex-wrap gap-2">
+              {% if person.is_pinned %}
+                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-sky-500/20 text-sky-200 border border-sky-400/20">
+                  Pinned
+                </span>
+              {% endif %}
+              {% if person.exclude_from_auto %}
+                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-rose-500/20 text-rose-200 border border-rose-400/20">
+                  Excluded
+                </span>
+              {% endif %}
+              {% if person.ignore_until %}
+                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-violet-500/20 text-violet-200 border border-violet-400/20">
+                  Ignored until {{ person.ignore_until }}
+                </span>
+              {% endif %}
+              {% if person.manual_priority is not none %}
+                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-200 border border-amber-400/20">
+                  Manual {{ person.manual_priority }}
+                </span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            {% if person %}
+              <a class="btn-secondary text-xs" href="{{ url_for('people.detail', person_id=person.id) }}">
+                Open person
+              </a>
+            {% endif %}
+
+            {% if candidate %}
+              {% if not person %}
+                <form method="post" action="{{ url_for('main.ensure_candidate_person', candidate_id=candidate.id) }}">
+                  <button class="btn-secondary text-xs" type="submit">Create person</button>
+                </form>
+              {% endif %}
+
+              {% if not active_event %}
+                <form method="post" action="{{ url_for('main.trigger_candidate_event', candidate_id=candidate.id) }}">
+                  <button class="btn-primary text-xs" type="submit">Trigger event</button>
+                </form>
+              {% endif %}
+
+              <form method="post" action="{{ url_for('main.promote_candidate', candidate_id=candidate.id) }}">
+                <button class="btn-secondary text-xs" type="submit">Promote</button>
+              </form>
+
+              <form method="post" action="{{ url_for('main.pin_candidate', candidate_id=candidate.id) }}">
+                <button class="btn-secondary text-xs" type="submit">Pin</button>
+              </form>
+
+              <form method="post" action="{{ url_for('main.ignore_candidate_7d', candidate_id=candidate.id) }}">
+                <button class="btn-secondary text-xs" type="submit">Ignore 7d</button>
+              </form>
+
+              <form method="post" action="{{ url_for('main.exclude_candidate', candidate_id=candidate.id) }}">
+                <button class="btn-danger text-xs" type="submit">Exclude</button>
+              </form>
+            {% endif %}
+
+            {% if display_source_url %}
+              <a class="btn-secondary text-xs" href="{{ display_source_url }}" target="_blank">Source</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-sm text-emerald-200/60">
+      No cached candidate yet. Use “Run detection” to populate the dashboard.
+    </div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <form method="get" action="{{ url_for('main.dashboard') }}" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+    <div>
+      <label class="field-label">Status</label>
+      <select class="field" name="status">
+        <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+        <option value="expired" {% if status == 'expired' %}selected{% endif %}>Expired</option>
+        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">View</label>
+      <select class="field" name="view">
+        <option value="all" {% if view == 'all' %}selected{% endif %}>All events</option>
+        <option value="soon" {% if view == 'soon' %}selected{% endif %}>Ending in 7 days</option>
+        <option value="problematic" {% if view == 'problematic' %}selected{% endif %}>Problematic</option>
+        <option value="published" {% if view == 'published' %}selected{% endif %}>Published only</option>
+        <option value="unpublished" {% if view == 'unpublished' %}selected{% endif %}>Without publication</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Sort</label>
+      <select class="field" name="sort">
+        <option value="priority_desc" {% if sort_by == 'priority_desc' %}selected{% endif %}>Priority ↓</option>
+        <option value="end_asc" {% if sort_by == 'end_asc' %}selected{% endif %}>End date ↑</option>
+        <option value="death_desc" {% if sort_by == 'death_desc' %}selected{% endif %}>Death date ↓</option>
+        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A → Z</option>
+        <option value="publications_desc" {% if sort_by == 'publications_desc' %}selected{% endif %}>Publications ↓</option>
+      </select>
+    </div>
+
+    <div class="flex items-end gap-3">
+      <button type="submit" class="btn-primary flex-1">Apply</button>
+      <a href="{{ url_for('main.dashboard') }}" class="btn-secondary">Reset</a>
+    </div>
+  </form>
+  <div class="flex items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 class="text-xl font-semibold text-white">Events</h2>
+      <p class="text-sm text-emerald-200/70">
+        Filter and sort tribute events for quick review.
+      </p>
+    </div>
+    <div class="text-xs text-emerald-200/60">
+      {{ events|length }} row{{ 's' if events|length != 1 else '' }}
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+          <th class="py-3">Person</th>
+          <th class="py-3">Death date</th>
+          <th class="py-3">Event range</th>
+          <th class="py-3">Days left</th>
+          <th class="py-3">Priority</th>
+          <th class="py-3">Status</th>
+          <th class="py-3">Targets</th>
+          <th class="py-3">Last sync</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for event in events %}
+        <tr class="border-b border-emerald-400/5 align-top">
+          <td class="py-3">
+            <a class="text-white hover:text-emerald-300 font-semibold" href="{{ url_for('people.detail', person_id=event.person_id) }}">{{ event.person.name }}</a>
+            <div class="text-xs text-emerald-200/60">{{ event.source }}</div>
+          </td>
+
+          <td class="py-3">{{ event.person.death_date }}</td>
+
+          <td class="py-3 whitespace-nowrap">
+            {{ event.start_date }} → {{ event.end_date }}
+          </td>
+
+          <td class="py-3">
+            {% if event.status == 'active' %}
+              <span class="text-white">{{ event.days_remaining }}</span>
+            {% else %}
+              <span class="text-emerald-100/60">—</span>
+            {% endif %}
+          </td>
+
+          <td class="py-3">{{ event.priority }}</td>
+
+          <td class="py-3">
+            <span class="status {{ event.status }}">{{ event.status }}</span>
+            {% if event.status == 'active' and event.days_remaining <= 7 %}
+              <div class="mt-1 text-xs text-amber-200">Ends soon</div>
+            {% endif %}
+          </td>
+
+          <td class="py-3">
+            {{ event.publications|length }}
+          </td>
+
+          <td class="py-3 whitespace-nowrap">
+            {% if event.last_synced_at %}
+              {{ event.last_synced_at.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}
+              <span class="text-emerald-100/60">Never</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="py-8 text-center text-emerald-200/60">No events yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const detectionEl = document.getElementById('detection-job-state');
+  const syncEl = document.getElementById('sync-job-state');
+  const expireEl = document.getElementById('expire-job-state');
+
+  if (!detectionEl && !syncEl && !expireEl) return;
+
+  const POLL_INTERVAL_MS = 10000;
+
+  let previousSnapshot = null;
+  let reloadScheduled = false;
+  let pollTimer = null;
+
+  const isActiveStatus = (status) => ['pending', 'running'].includes(status);
+  const isFinishedStatus = (status) => ['success', 'error'].includes(status);
+
+  const renderLine = (el, label, payload, idleText) => {
+    if (!el) return;
+
+    if (!payload || payload.status === 'idle') {
+      el.innerHTML = `${label} status: <span class="font-semibold">idle</span>${idleText ? ' — ' + idleText : ''}`;
+      return;
+    }
+
+    el.innerHTML =
+      `${label} status: <span class="font-semibold">${payload.status}</span>` +
+      (payload.message ? ` — ${payload.message}` : '');
+  };
+
+  const shouldReloadFromTransition = (previousData, currentData) => {
+    if (!previousData) return false;
+
+    for (const key of ['detection', 'sync', 'expire']) {
+      const prev = previousData[key];
+      const curr = currentData[key];
+
+      if (!prev || !curr) continue;
+      if (prev.id !== curr.id) continue;
+
+      if (isActiveStatus(prev.status) && isFinishedStatus(curr.status)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const poll = async () => {
+    if (document.hidden || reloadScheduled) return;
+
+    try {
+      const response = await fetch('{{ url_for("main.background_jobs_status") }}', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        cache: 'no-store'
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      renderLine(detectionEl, 'Detection', data.detection, 'No detection job yet.');
+      renderLine(syncEl, 'Sync', data.sync, 'No sync job yet.');
+      renderLine(expireEl, 'Expire', data.expire, 'No expire job yet.');
+
+      if (shouldReloadFromTransition(previousSnapshot, data)) {
+        reloadScheduled = true;
+        setTimeout(() => window.location.reload(), 1200);
+      }
+
+      previousSnapshot = data;
+    } catch (err) {
+      console.error('Background jobs status polling failed:', err);
+    }
+  };
+
+  const startPolling = () => {
+    if (pollTimer) return;
+    poll();
+    pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+  };
+
+  const stopPolling = () => {
+    if (!pollTimer) return;
+    clearInterval(pollTimer);
+    pollTimer = null;
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      startPolling();
+    }
+  });
+
+  startPolling();
+});
+</script>
+{% endblock %}

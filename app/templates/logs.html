@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="panel mb-6">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-semibold text-white">Application logs</h2>
+      <p class="text-sm text-emerald-200/70 mt-1">
+        Review background job activity and runtime errors.
+      </p>
+    </div>
+
+    <div class="text-xs text-emerald-200/60">
+      {{ log_rows|length }} row{{ 's' if log_rows|length != 1 else '' }} shown
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <form method="get" action="{{ url_for('main.logs') }}" class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-5">
+    <div>
+      <label class="field-label">Level</label>
+      <select class="field" name="level">
+        <option value="all" {% if level == 'all' %}selected{% endif %}>All</option>
+        <option value="info" {% if level == 'info' %}selected{% endif %}>Info</option>
+        <option value="warning" {% if level == 'warning' %}selected{% endif %}>Warning</option>
+        <option value="error" {% if level == 'error' %}selected{% endif %}>Error</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">Source</label>
+      <select class="field" name="source">
+        <option value="all" {% if source == 'all' %}selected{% endif %}>All</option>
+        <option value="detection" {% if source == 'detection' %}selected{% endif %}>Detection</option>
+        <option value="sync" {% if source == 'sync' %}selected{% endif %}>Sync</option>
+        <option value="expire" {% if source == 'expire' %}selected{% endif %}>Expire</option>
+        <option value="cleanup" {% if source == 'cleanup' %}selected{% endif %}>Cleanup</option>
+        <option value="scheduler" {% if source == 'scheduler' %}selected{% endif %}>Scheduler</option>
+        <option value="arr" {% if source == 'arr' %}selected{% endif %}>Arr</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label">From</label>
+      <input type="date" class="field" name="date_from" value="{{ date_from }}">
+    </div>
+
+    <div>
+      <label class="field-label">To</label>
+      <input type="date" class="field" name="date_to" value="{{ date_to }}">
+    </div>
+
+    <div>
+      <label class="field-label">Limit</label>
+      <select class="field" name="limit">
+        <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+
+    <div class="flex items-end gap-3">
+      <button type="submit" class="btn-primary flex-1">Apply</button>
+      <a href="{{ url_for('main.logs') }}" class="btn-secondary">Reset</a>
+    </div>
+  </form>
+
+  <div class="space-y-3">
+    {% for row in log_rows %}
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span class="status {{ row.level }}">{{ row.level }}</span>
+
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-sky-500/10 text-sky-200 border border-sky-400/20">
+                {{ row.source }}
+              </span>
+
+              {% if row.related_label %}
+                {% if row.related_url %}
+                  <a
+                    href="{{ row.related_url }}"
+                    class="text-xs text-sky-200 hover:text-sky-100 underline underline-offset-2"
+                  >
+                    {{ row.related_label }}
+                  </a>
+                {% else %}
+                  <span class="text-xs text-emerald-200/60">
+                    {{ row.related_label }}
+                  </span>
+                {% endif %}
+              {% elif row.related_type and row.related_id %}
+                <span class="text-xs text-emerald-200/60">
+                  {{ row.related_type }} #{{ row.related_id }}
+                </span>
+              {% endif %}
+            </div>
+
+            <div class="min-w-0">
+              <div
+                class="js-log-collapsible overflow-hidden"
+                data-collapsed="true"
+                style="max-height: 3.5rem;"
+              >
+                <div class="text-white font-medium break-words">
+                  {{ row.message }}
+                </div>
+
+                {% if row.details %}
+                  <div class="mt-2 text-sm text-emerald-100/70 whitespace-pre-wrap break-words">
+                    {{ row.details }}
+                  </div>
+                {% endif %}
+              </div>
+
+              <button
+                type="button"
+                class="js-log-toggle hidden mt-2 inline-flex items-center gap-2 text-xs text-emerald-200/70 hover:text-white"
+                aria-expanded="false"
+              >
+                <span class="js-log-toggle-icon">▼</span>
+                <span class="js-log-toggle-label">Show more</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="text-xs text-emerald-200/60 whitespace-nowrap">
+            {{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="py-8 text-center text-emerald-200/60">
+        No logs found for the current filters.
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const REFRESH_INTERVAL_MS = 15000;
+  const COLLAPSED_HEIGHT_PX = 56;
+  let refreshTimer = null;
+
+  const setupLogToggles = () => {
+    document.querySelectorAll('.js-log-collapsible').forEach((content) => {
+      const wrapper = content.parentElement;
+      const toggle = wrapper ? wrapper.querySelector('.js-log-toggle') : null;
+      const icon = toggle ? toggle.querySelector('.js-log-toggle-icon') : null;
+      const label = toggle ? toggle.querySelector('.js-log-toggle-label') : null;
+
+      if (!toggle) return;
+
+      const needsToggle = content.scrollHeight > (COLLAPSED_HEIGHT_PX + 8);
+
+      if (!needsToggle) {
+        content.style.maxHeight = 'none';
+        content.dataset.collapsed = 'false';
+        toggle.classList.add('hidden');
+        return;
+      }
+
+      content.style.maxHeight = `${COLLAPSED_HEIGHT_PX}px`;
+      content.dataset.collapsed = 'true';
+      toggle.classList.remove('hidden');
+      toggle.setAttribute('aria-expanded', 'false');
+
+      toggle.addEventListener('click', () => {
+        const isCollapsed = content.dataset.collapsed === 'true';
+
+        if (isCollapsed) {
+          content.style.maxHeight = `${content.scrollHeight}px`;
+          content.dataset.collapsed = 'false';
+          toggle.setAttribute('aria-expanded', 'true');
+          if (icon) icon.textContent = '▲';
+          if (label) label.textContent = 'Show less';
+        } else {
+          content.style.maxHeight = `${COLLAPSED_HEIGHT_PX}px`;
+          content.dataset.collapsed = 'true';
+          toggle.setAttribute('aria-expanded', 'false');
+          if (icon) icon.textContent = '▼';
+          if (label) label.textContent = 'Show more';
+        }
+      }, { once: false });
+    });
+  };
+
+  const reloadPage = () => {
+    if (document.hidden) return;
+    window.location.reload();
+  };
+
+  const startRefresh = () => {
+    if (refreshTimer) return;
+    refreshTimer = setInterval(reloadPage, REFRESH_INTERVAL_MS);
+  };
+
+  const stopRefresh = () => {
+    if (!refreshTimer) return;
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  };
+
+  setupLogToggles();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopRefresh();
+    } else {
+      startRefresh();
+    }
+  });
+
+  startRefresh();
+});
+</script>
+
+{% endblock %}
