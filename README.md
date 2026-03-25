@@ -112,8 +112,7 @@ memoria/
 ---
 
 ## 🚀 Roadmap
-
-- Jellyfin support  
+ 
 - Better matching algorithm  
 - Multi-language support  
 - Performance improvements on large libraries  
