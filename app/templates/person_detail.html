@@ -276,7 +276,12 @@
                   <td class="py-2"><span class="status {{ publication.status }}">{{ publication.status }}</span></td>
                   <td class="py-2 text-emerald-100/70">{{ publication.last_message or '—' }}</td>
                   <td class="py-2 text-emerald-200/60">
-                    {{ publication.last_synced_at.strftime('%Y-%m-%d %H:%M') if publication.last_synced_at else '—' }}
+					<span
+					  data-local-datetime="{{ publication.last_synced_at|datetime_utc_iso if publication.last_synced_at else '' }}"
+					  data-local-datetime-seconds="0"
+					>
+					  {{ publication.last_synced_at.strftime('%Y-%m-%d %H:%M') if publication.last_synced_at else '—' }}
+					</span>
                   </td>
                 </tr>
               {% else %}
@@ -464,7 +469,12 @@
         {% for activity in person.arr_activities|sort(attribute='created_at', reverse=True) %}
           <tr class="border-b border-emerald-400/5">
             <td class="py-2 text-emerald-100/70">
-              {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+              <span
+				  data-local-datetime="{{ activity.created_at|datetime_utc_iso if activity.created_at else '' }}"
+				  data-local-datetime-seconds="0"
+				>
+				  {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+				</span>
             </td>
             <td class="py-2">{{ activity.media_kind }}</td>
 			<td class="py-2">{{ activity.title }}</td>
@@ -574,7 +584,12 @@
         <div class="text-xs text-emerald-200/60 mb-4">
           {% if person.missing_titles_status == 'ready' %}
             Last automatic scan:
-            {{ person.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') if person.missing_titles_scanned_at else '—' }}
+			<span
+			  data-local-datetime="{{ person.missing_titles_scanned_at|datetime_utc_iso if person.missing_titles_scanned_at else '' }}"
+			  data-local-datetime-seconds="0"
+			>
+			  {{ person.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') if person.missing_titles_scanned_at else '—' }}
+			</span>
           {% elif person.missing_titles_status == 'error' %}
             Last scan failed: {{ person.missing_titles_error or 'Unknown error' }}
           {% elif person.missing_titles_status == 'disabled' %}

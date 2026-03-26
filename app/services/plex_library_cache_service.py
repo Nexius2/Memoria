@@ -87,3 +87,55 @@ def is_library_cache_due(target: LibraryTarget, refresh_hours: int = 24) -> bool
 
     cutoff = datetime.utcnow() - timedelta(hours=refresh_hours)
     return target.plex_titles_cached_at <= cutoff
+
+
+def get_library_title_cache(target: LibraryTarget) -> tuple[set[tuple[str, int | None]], set[str]]:
+    if target.plex_titles_cache_status == 'ready' and target.plex_titles_cached_at:
+        return load_library_title_cache(target)
+
+    return refresh_library_title_cache_safe(target)
+
+
+def filter_credits_with_library_cache(
+    target: LibraryTarget,
+    credits: list[dict],
+    *,
+    media_type: str | None = None,
+) -> list[dict]:
+    keys_with_year, keys_without_year = get_library_title_cache(target)
+    filtered: list[dict] = []
+    seen_keys: set[tuple[str, int | None, str | None]] = set()
+
+    for credit in credits:
+        credit_media_type = credit.get('media_type')
+        if media_type and credit_media_type != media_type:
+            continue
+
+        raw_title = (credit.get('title') or credit.get('name') or '').strip()
+        if not raw_title:
+            continue
+
+        normalized_title = ''.join(ch.lower() if ch.isalnum() else ' ' for ch in raw_title)
+        normalized_title = ' '.join(normalized_title.split())
+        if not normalized_title:
+            continue
+
+        raw_date = credit.get('release_date') or credit.get('first_air_date') or ''
+        year = int(raw_date[:4]) if raw_date[:4].isdigit() else None
+
+        has_match = (
+            (normalized_title, year) in keys_with_year
+            or normalized_title in keys_without_year
+        )
+
+        if not has_match:
+            continue
+
+        dedupe_key = (normalized_title, year, credit_media_type)
+        if dedupe_key in seen_keys:
+            continue
+
+        seen_keys.add(dedupe_key)
+        filtered.append(credit)
+
+    return filtered

@@ -128,7 +128,12 @@
           </div>
 
           <div class="text-xs text-emerald-200/60 whitespace-nowrap">
-            {{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
+            <span
+			  data-local-datetime="{{ row.created_at|datetime_utc_iso if row.created_at else '' }}"
+			  data-local-datetime-seconds="1"
+			>
+			  {{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
+			</span>
           </div>
         </div>
       </div>

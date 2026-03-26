@@ -255,6 +255,88 @@ class PlexService:
 
         return results
 
+    def find_items_by_credit_titles_via_scan(
+        self,
+        section_name: str,
+        credits: list[dict],
+        media_type: str | None = None,
+        limit: int | None = None,
+    ) -> list[PlexMatch]:
+        section = self.server.library.section(section_name)
+
+        expected_titles: dict[str, set[int | None]] = {}
+
+        for credit in credits:
+            credit_media_type = credit.get("media_type")
+            if media_type and credit_media_type != media_type:
+                continue
+
+            raw_title = (credit.get("title") or credit.get("name") or "").strip()
+            normalized_title = _normalize_text(raw_title)
+            if not normalized_title:
+                continue
+
+            raw_date = credit.get("release_date") or credit.get("first_air_date") or ""
+            year = int(raw_date[:4]) if raw_date[:4].isdigit() else None
+
+            expected_titles.setdefault(normalized_title, set()).add(year)
+
+        if not expected_titles:
+            return []
+
+        results: list[PlexMatch] = []
+        seen_keys: set[str] = set()
+
+        try:
+            items = section.all()
+        except Exception:
+            return []
+
+        for item in items:
+            item_titles = self._item_titles(item)
+            if not item_titles:
+                continue
+
+            matched_title = None
+            expected_years = None
+
+            for item_title in item_titles:
+                if item_title in expected_titles:
+                    matched_title = item_title
+                    expected_years = expected_titles[item_title]
+                    break
+
+            if not matched_title:
+                continue
+
+            item_year = self._item_year(item)
+            if (
+                item_year is not None
+                and expected_years is not None
+                and None not in expected_years
+                and item_year not in expected_years
+            ):
+                continue
+
+            rating_key = str(getattr(item, "ratingKey", ""))
+            if not rating_key or rating_key in seen_keys:
+                continue
+
+            seen_keys.add(rating_key)
+            results.append(
+                PlexMatch(
+                    item=item,
+                    title=getattr(item, "title", "Unknown"),
+                    year=item_year,
+                    match_source="tmdb_title_scan",
+                )
+            )
+
+            if limit and len(results) >= limit:
+                return results[:limit]
+
+        return results
+
     def upsert_collection(
         self,
         section_name: str,

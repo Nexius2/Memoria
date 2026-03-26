@@ -84,7 +84,14 @@
         {% for row in job_rows %}
           <tr class="border-b border-emerald-400/5 align-top">
             <td class="py-3 pr-4 whitespace-nowrap text-emerald-100/80">
-              <div>{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}</div>
+			<div>
+			  <span
+				data-local-datetime="{{ row.created_at|datetime_utc_iso if row.created_at else '' }}"
+				data-local-datetime-seconds="1"
+			  >
+				{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
+			  </span>
+			</div>
               <div class="text-[11px] text-emerald-200/50">
                 #{{ row.id }}
               </div>
@@ -114,11 +121,21 @@
             <td class="py-3 pr-4 text-emerald-100/70 whitespace-nowrap">
               <div>
                 <span class="text-emerald-200/50">Start:</span>
-                {{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '—' }}
+                <span
+				  data-local-datetime="{{ row.started_at|datetime_utc_iso if row.started_at else '' }}"
+				  data-local-datetime-seconds="1"
+				>
+				  {{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '—' }}
+				</span>
               </div>
               <div>
                 <span class="text-emerald-200/50">End:</span>
-                {{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '—' }}
+                <span
+				  data-local-datetime="{{ row.finished_at|datetime_utc_iso if row.finished_at else '' }}"
+				  data-local-datetime-seconds="1"
+				>
+				  {{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '—' }}
+				</span>
               </div>
             </td>
 

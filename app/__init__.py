@@ -1,4 +1,5 @@
 import os
+from datetime import timezone
 from pathlib import Path
 
 from flask import Flask
@@ -151,6 +152,19 @@ def create_app():
     app.register_blueprint(people_bp, url_prefix='/people')
     app.register_blueprint(arr_bp, url_prefix='/arr')
 
+    def datetime_utc_iso(value):
+        if not value:
+            return ''
+
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        else:
+            value = value.astimezone(timezone.utc)
+
+        return value.isoformat().replace('+00:00', 'Z')
+
+    app.jinja_env.filters['datetime_utc_iso'] = datetime_utc_iso
+
     @app.context_processor
     def inject_globals():
         from .models import AppSettings, ArrServer, LibraryTarget
@@ -166,8 +180,9 @@ def create_app():
         AppSettings.get_or_create()
 
         if app.config['SCHEDULER_ENABLED'] and not scheduler.running:
-            from .services.scheduler_service import register_jobs
+            from .services.scheduler_service import register_jobs, schedule_startup_catchup
             register_jobs(app)
             scheduler.start()
+            schedule_startup_catchup(app)
 
     return app

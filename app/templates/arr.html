@@ -257,7 +257,12 @@
                   <div>
                     <div class="text-emerald-200/60">Created</div>
                     <div class="text-white">
-                      {{ arr.created_at.strftime('%Y-%m-%d %H:%M') if arr.created_at else '—' }}
+						<span
+						  data-local-datetime="{{ arr.created_at|datetime_utc_iso if arr.created_at else '' }}"
+						  data-local-datetime-seconds="0"
+						>
+						  {{ arr.created_at.strftime('%Y-%m-%d %H:%M') if arr.created_at else '—' }}
+						</span>
                     </div>
                   </div>
                 </div>
@@ -372,7 +377,12 @@
         {% for activity in arr_activities %}
           <tr class="border-b border-emerald-400/5 align-top">
             <td class="py-3 pr-4 text-emerald-100/70 whitespace-nowrap">
-              {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+				<span
+				  data-local-datetime="{{ activity.created_at|datetime_utc_iso if activity.created_at else '' }}"
+				  data-local-datetime-seconds="0"
+				>
+				  {{ activity.created_at.strftime('%Y-%m-%d %H:%M') if activity.created_at else '—' }}
+				</span>
             </td>
 
             <td class="py-3 pr-4">

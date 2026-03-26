@@ -33,6 +33,9 @@ _SYNC_TASK_LOCK = Lock()
 _EXPIRE_TASK_LOCK = Lock()
 _CLEANUP_TASK_LOCK = Lock()
 
+_STARTUP_DETECTION_COOLDOWN_MINUTES = 30
+_STARTUP_TASK_COOLDOWN_MINUTES = 30
+
 def log_app_event(
     level: str,
     source: str,
@@ -114,9 +117,179 @@ def register_jobs(app):
         replace_existing=True,
     )
 
+def schedule_startup_catchup(app) -> None:
+    if scheduler.get_job('startup_catchup'):
+        return
+
+    scheduler.add_job(
+        func=lambda: _run_in_app(app, run_startup_catchup, app),
+        trigger='date',
+        run_date=datetime.now(scheduler.timezone) + timedelta(seconds=5),
+        id='startup_catchup',
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
+
+def run_startup_catchup(app) -> None:
+    log_app_event(
+        'info',
+        'scheduler',
+        'Startup catch-up started.',
+    )
+
+    recover_stale_detection_runs()
+    recover_stale_task_runs()
+
+    try:
+        refresh_plex_library_caches()
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed during Plex library cache refresh.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed during Plex library cache refresh.',
+            details=str(exc),
+        )
+
+    try:
+        if _should_run_detection_startup_catchup():
+            enqueue_auto_detection_run(app)
+        else:
+            _log_startup_catchup_skip(
+                'auto detection',
+                f'A successful detection run finished less than {_STARTUP_DETECTION_COOLDOWN_MINUTES} minutes ago.',
+            )
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed while queueing auto detection.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed while queueing auto detection.',
+            details=str(exc),
+        )
+
+    try:
+        if _should_run_task_startup_catchup('sync'):
+            enqueue_task_run(app, 'sync', 'startup')
+        else:
+            _log_startup_catchup_skip(
+                'sync',
+                f'A successful sync run finished less than {_STARTUP_TASK_COOLDOWN_MINUTES} minutes ago.',
+            )
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed while queueing sync task.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed while queueing sync task.',
+            details=str(exc),
+        )
+
+    try:
+        if _should_run_task_startup_catchup('expire'):
+            enqueue_task_run(app, 'expire', 'startup')
+        else:
+            _log_startup_catchup_skip(
+                'expire',
+                f'A successful expire run finished less than {_STARTUP_TASK_COOLDOWN_MINUTES} minutes ago.',
+            )
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed while queueing expire task.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed while queueing expire task.',
+            details=str(exc),
+        )
+
+    try:
+        refresh_missing_titles_cache()
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed during missing titles refresh.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed during missing titles refresh.',
+            details=str(exc),
+        )
+
+    try:
+        push_active_events_missing_to_arr()
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed during Arr push.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed during Arr push.',
+            details=str(exc),
+        )
+
+    log_app_event(
+        'info',
+        'scheduler',
+        'Startup catch-up finished.',
+    )
+
 def _run_in_app(app, fn, *args, **kwargs):
     with app.app_context():
         fn(*args, **kwargs)
+
+def _was_finished_recently(finished_at: datetime | None, cooldown_minutes: int) -> bool:
+    if not finished_at:
+        return False
+
+    cutoff = datetime.utcnow() - timedelta(minutes=max(int(cooldown_minutes or 0), 1))
+    return finished_at >= cutoff
+
+
+def _latest_successful_detection_run() -> DetectionRun | None:
+    return (
+        DetectionRun.query
+        .filter(DetectionRun.status == 'success')
+        .order_by(DetectionRun.finished_at.desc(), DetectionRun.id.desc())
+        .first()
+    )
+
+
+def _latest_successful_task_run(task_type: str) -> TaskRun | None:
+    return (
+        TaskRun.query
+        .filter(
+            TaskRun.task_type == task_type,
+            TaskRun.status == 'success',
+        )
+        .order_by(TaskRun.finished_at.desc(), TaskRun.id.desc())
+        .first()
+    )
+
+
+def _should_run_detection_startup_catchup(cooldown_minutes: int = _STARTUP_DETECTION_COOLDOWN_MINUTES) -> bool:
+    latest_run = _latest_successful_detection_run()
+    if not latest_run:
+        return True
+
+    return not _was_finished_recently(latest_run.finished_at, cooldown_minutes)
+
+
+def _should_run_task_startup_catchup(
+    task_type: str,
+    cooldown_minutes: int = _STARTUP_TASK_COOLDOWN_MINUTES,
+) -> bool:
+    latest_run = _latest_successful_task_run(task_type)
+    if not latest_run:
+        return True
+
+    return not _was_finished_recently(latest_run.finished_at, cooldown_minutes)
+
+
+def _log_startup_catchup_skip(job_name: str, reason: str) -> None:
+    log_app_event(
+        'info',
+        'scheduler',
+        f'Startup catch-up skipped for {job_name}.',
+        details=reason,
+    )
 
 def refresh_plex_library_caches(task_run_id: int | None = None) -> dict:
     targets = (
@@ -639,8 +812,7 @@ def execute_detection_run(run_id: int) -> None:
         )
 
         try:
-            sync_new_events = (run.requested_by == 'auto')
-            result = auto_detect_and_sync(force=True, sync_new_events=sync_new_events)
+            result = auto_detect_and_sync(force=True, sync_new_events=True)
 
             run.status = 'success'
             run.candidates_cached = int(result.get('cached') or 0)
@@ -782,7 +954,10 @@ def _select_rows_for_auto_events(rows: list[dict], people_by_slug: dict[str, Per
 
     return eligible_rows[:max_people]
 
-def _cancel_out_of_scope_web_events(selected_slugs: set[str]) -> None:
+def _collect_replacement_candidates(selected_slugs: set[str], needed_slots: int) -> list[TributeEvent]:
+    if needed_slots <= 0:
+        return []
+
     active_web_events = (
         TributeEvent.query
         .join(Person)
@@ -792,6 +967,8 @@ def _cancel_out_of_scope_web_events(selected_slugs: set[str]) -> None:
         )
         .all()
     )
+
+    removable_events: list[TributeEvent] = []
 
     for event in active_web_events:
         person = event.person
@@ -805,12 +982,17 @@ def _cancel_out_of_scope_web_events(selected_slugs: set[str]) -> None:
         if person.manual_priority is not None and person.manual_priority > 0:
             continue
 
-        remove_event_collections(event)
-        event.status = 'cancelled'
-        event.note = (
-            'Cancelled automatically because the person is no longer selected '
-            'by the current auto-selection logic.'
+        removable_events.append(event)
+
+    removable_events.sort(
+        key=lambda event: (
+            int(event.priority or 0),
+            event.start_date or date.min,
+            event.id or 0,
         )
+    )
+
+    return removable_events[:needed_slots]
 
 
 def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
@@ -839,8 +1021,6 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
     )
     selected_slugs = {row['slug'] for row in selected_rows}
 
-    _cancel_out_of_scope_web_events(selected_slugs)
-
     active_events = (
         TributeEvent.query
         .join(Person)
@@ -866,19 +1046,53 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
 
         if active_event:
             active_event.priority = selection_priority
+
+            if sync_new_events:
+                should_sync_existing_event = (
+                    active_event.last_synced_at is None
+                    or not active_event.publications
+                    or not any(pub.status == 'synced' for pub in active_event.publications)
+                )
+
+                if should_sync_existing_event:
+                    sync_event(active_event)
+
             continue
+
+    rows_to_create = [
+        row
+        for row in selected_rows
+        if people_by_slug[row['slug']].id not in active_events_by_person_id
+    ]
+
+    available_web_slots = max(settings.max_people - len(active_web_events_by_slug), 0)
+    missing_slots = max(len(rows_to_create) - available_web_slots, 0)
+
+    replacement_candidates = _collect_replacement_candidates(
+        selected_slugs=selected_slugs,
+        needed_slots=missing_slots,
+    )
+
+    for replaced_event in replacement_candidates:
+        replaced_person = replaced_event.person
+
+        remove_event_collections(replaced_event)
+        replaced_event.status = 'cancelled'
+        replaced_event.note = (
+            'Cancelled automatically because the person was replaced by another '
+            'auto-selected person and no free web slot was available.'
+        )
+
+        active_events_by_person_id.pop(replaced_event.person_id, None)
+        active_web_events_by_slug.pop(replaced_person.slug, None)
 
     available_web_slots = max(settings.max_people - len(active_web_events_by_slug), 0)
 
-    for row in selected_rows:
+    for row in rows_to_create:
         if available_web_slots <= 0:
             break
 
         person = people_by_slug[row['slug']]
-
-        if person.id in active_events_by_person_id:
-            continue
-
         selection_priority = int(row.get('_selection_priority') or row.get('popularity_score') or 0)
 
         event = create_or_retrigger_event(
@@ -1011,32 +1225,38 @@ def expire_events(task_run_id: int | None = None):
         related_id=task_run_id,
     )
 
-    expired_count = expire_due_events()
+    expire_result = expire_due_events()
+
+    processed_items = int(expire_result.get('processed_items') or 0)
+    success_items = int(expire_result.get('success_items') or 0)
+    error_items = int(expire_result.get('error_items') or 0)
+    message = expire_result.get('message') or f'{success_items} event(s) expired, {error_items} error(s).'
 
     if task_run_id:
         _update_task_run_progress(
             task_run_id,
             total_items=total_items,
-            processed_items=total_items,
-            success_items=expired_count,
-            error_items=0,
-            message=f'{expired_count} event(s) expired.',
+            processed_items=processed_items,
+            success_items=success_items,
+            error_items=error_items,
+            message=message,
         )
 
     log_app_event(
-        'info',
+        'info' if error_items == 0 else 'warning',
         'expire',
-        f'Expire check finished: {expired_count} event(s) expired.',
+        f'Expire check finished: {success_items} event(s) expired, {error_items} error(s).',
+        details=message,
         related_type='task_run',
         related_id=task_run_id,
     )
 
     return {
         'total_items': total_items,
-        'processed_items': total_items,
-        'success_items': expired_count,
-        'error_items': 0,
-        'message': f'{expired_count} event(s) expired.',
+        'processed_items': processed_items,
+        'success_items': success_items,
+        'error_items': error_items,
+        'message': message,
     }
 
 def cleanup_history(task_run_id: int | None = None):

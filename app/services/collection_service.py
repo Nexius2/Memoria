@@ -7,6 +7,7 @@ from ..extensions import db
 from ..models import AppSettings, TributeEvent, CollectionPublication, LibraryTarget, PlexServer
 from .plex_service import PlexService
 from .tmdb_service import TmdbService
+from .plex_library_cache_service import filter_credits_with_library_cache
 
 
 def render_template_text(template: str, *, person, event, target=None) -> str:
@@ -74,6 +75,21 @@ def _find_matches_for_target(plex: PlexService, target, person, tmdb_credits: di
     if tmdb_credits:
         media_type = 'movie' if target.media_type == 'movie' else 'tv'
         credits = (tmdb_credits.get('cast') or []) + (tmdb_credits.get('crew') or [])
+
+        cached_credits = filter_credits_with_library_cache(
+            target,
+            credits,
+            media_type=media_type,
+        )
+
+        if cached_credits:
+            title_matches = plex.find_items_by_credit_titles(
+                target.section_name,
+                cached_credits,
+                media_type=media_type,
+            )
+            if title_matches:
+                return title_matches
 
         title_matches = plex.find_items_by_credit_titles(
             target.section_name,
@@ -197,24 +213,58 @@ def sync_event(event: TributeEvent) -> None:
     db.session.commit()
 
 
-def expire_due_events() -> int:
-    count = 0
-    events = TributeEvent.query.filter_by(status='active').all()
+def expire_due_events() -> dict:
+    events = (
+        TributeEvent.query
+        .filter(
+            TributeEvent.status == 'active',
+            TributeEvent.end_date < date.today(),
+        )
+        .all()
+    )
+
+    processed_items = 0
+    success_items = 0
+    error_items = 0
 
     for event in events:
-        if event.end_date >= date.today():
-            continue
+        processed_items += 1
 
-        remove_event_collections(event)
-        event.status = 'expired'
-        count += 1
+        removal_result = remove_event_collections(event)
+
+        if removal_result['all_removed']:
+            event.status = 'expired'
+            success_items += 1
+        else:
+            error_items += 1
+            current_app.logger.warning(
+                'Event %s was not marked as expired because some collections could not be removed.',
+                event.id,
+            )
 
     db.session.commit()
-    return count
+
+    return {
+        'processed_items': processed_items,
+        'success_items': success_items,
+        'error_items': error_items,
+        'message': (
+            f'{success_items} event(s) expired successfully, '
+            f'{error_items} event(s) kept active for retry.'
+        ),
+    }
 
 
-def remove_event_collections(event: TributeEvent) -> None:
+def remove_event_collections(event: TributeEvent) -> dict:
+    total_items = len(event.publications)
+    removed_items = 0
+    error_items = 0
+
     for publication in event.publications:
+        if publication.status == 'removed':
+            removed_items += 1
+            continue
+
         try:
             target = publication.target
             plex = PlexService(
@@ -227,13 +277,30 @@ def remove_event_collections(event: TributeEvent) -> None:
                 publication.plex_collection_key,
                 publication.collection_title,
             )
+
+            if message == 'Collection not found':
+                publication.status = 'removed'
+                publication.last_message = 'Collection already absent on Plex.'
+                publication.last_synced_at = datetime.utcnow()
+                removed_items += 1
+                continue
+
             publication.status = 'removed'
             publication.last_message = message
             publication.last_synced_at = datetime.utcnow()
+            removed_items += 1
 
         except Exception as exc:
             publication.status = 'error'
             publication.last_message = f'Delete failed: {exc}'
             publication.last_synced_at = datetime.utcnow()
+            error_items += 1
 
     db.session.flush()
+
+    return {
+        'total_items': total_items,
+        'removed_items': removed_items,
+        'error_items': error_items,
+        'all_removed': error_items == 0,
+    }

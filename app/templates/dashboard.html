@@ -481,7 +481,12 @@
 
           <td class="py-3 whitespace-nowrap">
             {% if event.last_synced_at %}
-              {{ event.last_synced_at.strftime('%Y-%m-%d %H:%M') }}
+              <span
+				  data-local-datetime="{{ event.last_synced_at|datetime_utc_iso if event.last_synced_at else '' }}"
+				  data-local-datetime-seconds="0"
+				>
+				  {{ event.last_synced_at.strftime('%Y-%m-%d %H:%M') }}
+				</span>
             {% else %}
               <span class="text-emerald-100/60">Never</span>
             {% endif %}

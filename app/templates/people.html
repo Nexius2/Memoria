@@ -270,7 +270,13 @@
                       <div class="text-emerald-200/80">
                         Scan ready
                         {% if row.missing_titles_scanned_at %}
-                          · {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
+						·
+						<span
+						  data-local-datetime="{{ row.missing_titles_scanned_at|datetime_utc_iso if row.missing_titles_scanned_at else '' }}"
+						  data-local-datetime-seconds="0"
+						>
+						  {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
+						</span>
                         {% endif %}
                       </div>
                     {% elif row.missing_titles_status == 'error' %}

@@ -109,14 +109,26 @@
                     <div class="text-emerald-300">
                       Plex cache ready
                       {% if library.plex_titles_cached_at %}
-                        · {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+						·
+						<span
+						  data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
+						  data-local-datetime-seconds="0"
+						>
+						  {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+						</span>
                       {% endif %}
                     </div>
                   {% elif library.plex_titles_cache_status == 'error' %}
                     <div class="text-red-300">
                       Plex cache error
                       {% if library.plex_titles_cached_at %}
-                        · {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+						·
+						<span
+						  data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
+						  data-local-datetime-seconds="0"
+						>
+						  {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+						</span>
                       {% endif %}
                     </div>
                     {% if library.plex_titles_cache_error %}
