@@ -1,214 +1,147 @@
 # Memoria
 
-Memoria is a self-hosted Docker application that automatically detects recently deceased actors and public figures, matches them against your Plex libraries, and creates curated **In Memoriam** collections.
+Memoria is a self-hosted tool designed to automatically build and maintain **Plex collections based on people (actors, directors, etc.)**, and enrich your media ecosystem by detecting and adding missing content.
 
-The goal is simple: keep your Plex library up to date with meaningful memorial collections, with as little manual work as possible.
+It connects your Plex server with TMDB and your *Arr stack (Radarr / Sonarr)* to keep everything up-to-date — without manual work.
 
 ---
 
 ## Features
 
-- Detect recently deceased people
-- Enrich metadata with TMDb
-- Match people against your Plex libraries
-- Create Plex collections automatically
-- Create one collection per person and per matching library
-- Use the person's image as the collection poster
-- Automatically remove expired collections after a configurable delay
-- Add people manually
-- Correct manually entered person data using fetched metadata
-- Background jobs for automation
-- Job history and logs from the web UI
-
----
-
-## How it works
-
-1. Memoria fetches recently deceased people from external sources
-2. It enriches them with metadata from TMDb
-3. It scans your Plex libraries
-4. It looks for matching movies and TV shows in your media libraries
-5. It creates or updates Plex collections for matching content
-6. After the configured retention period, collections are removed automatically
-
-Collections are only created when matching media exists in your Plex libraries.
-
----
-
-## Important notes
-
-- Memoria is designed to run with Docker / Docker Compose
-- Configuration of Plex servers, TMDb, and Arr services is mainly done from the web UI
-- The built-in scheduler is intended to run in a single application instance
-- Do not run multiple Memoria containers with the scheduler enabled against the same database
-- This project is intended for self-hosted/private use
-- Do not expose it directly to the public Internet without proper protection
+- 🎬 Automatic Plex collections based on people  
+- 🔍 Detect missing movies and TV shows  
+- ➕ Send missing content to Radarr / Sonarr  
+- 🔁 Continuous background synchronization  
+- 🧠 Smart matching (handles duplicates and edge cases)  
+- 📊 Simple web interface to monitor and control everything  
 
 ---
 
 ## Requirements
 
-- Docker
-- Docker Compose
-- A Plex Media Server
-- A TMDb API key
+- Docker  
+- Plex server  
+- TMDB API key  
+- (Optional but recommended)
+  - Radarr
+  - Sonarr
 
 ---
 
-## Quick start
+## Installation (Recommended)
 
-### 1. Clone the repository
+The easiest way to install Memoria is to use the provided script:
 
-git clone https://github.com/yourusername/memoria.git
-cd memoria
+### 1. Download the project
 
-### 2. Create the data folder
+git clone https://github.com/YOUR_REPO/memoria.git  
+cd memoria  
 
-mkdir -p data
+### 2. Run the container creation script
 
-### 3. Edit docker-compose.yml
+./create-container-test.sh  
 
-At minimum, change:
+That’s it.  
+The script will:
 
-- SECRET_KEY
-- optionally TZ
+- Build the Docker image  
+- Create and start the container  
+- Apply default configuration  
 
-Example:
-
-environment:
-  TZ: Europe/Paris
-  SECRET_KEY: change-me-with-a-long-random-secret
-  DATABASE_PATH: /data/memoria.db
-  SCHEDULER_ENABLED: "1"
-
-Use a long random value for SECRET_KEY.
-
-### 4. Start Memoria
-
-docker compose up -d --build
-
-### 5. Open the web UI
-
-http://localhost:8080
+No manual environment variables required.
 
 ---
 
-## Docker configuration
+## Access the Web Interface
 
-The default Docker setup uses:
+Once the container is running, open:
 
-- port: 8080
-- database path in container: /data/memoria.db
-- mounted persistent folder: ./data
+http://YOUR_SERVER_IP:PORT  
 
-### Environment variables
-
-| Variable | Required | Default | Description |
-|---|---:|---|---|
-| SECRET_KEY | Yes | change-me | Flask secret key. Change this before real use. |
-| DATABASE_PATH | No | /data/memoria.db | SQLite database path inside the container |
-| SCHEDULER_ENABLED | No | 1 | Enables background jobs |
-| TZ | No | system default | Container timezone |
+(Port depends on your container configuration — check your script output or Docker logs.)
 
 ---
 
-## First-time setup
+## First Configuration
 
-After the container is running, use the web UI to configure:
+When you access Memoria for the first time:
 
-- Plex server URL and token
-- TMDb API key
-- Collection retention settings
-- Optional Arr integrations
-- Automation behavior
+1. Add your Plex server  
+2. Add your TMDB API key  
+3. (Optional) Configure Radarr / Sonarr  
 
-Important: Plex, TMDb and Arr are not primarily configured from environment variables. They are configured from the application interface.
+Once configured, Memoria will start working automatically.
 
 ---
 
-## Data persistence
+## How It Works
 
-Memoria stores its SQLite database in:
+Memoria continuously:
 
-/data/memoria.db
+1. Scans your Plex libraries  
+2. Detects people (actors, directors, etc.)  
+3. Creates and updates Plex collections  
+4. Searches for missing content via TMDB  
+5. Sends missing items to Radarr / Sonarr  
 
-With the provided Compose file, that maps to:
+Everything runs in background jobs — no manual actions required.
 
-./data/memoria.db
+---
 
-If you remove the container but keep the data folder, your application data is preserved.
+## Automation
+
+Memoria is designed to be **fully automatic**:
+
+- Background tasks run continuously  
+- Collections are updated automatically  
+- Missing content is detected and handled  
+- No cron setup required  
 
 ---
 
 ## Updating
 
-To update after pulling new code:
+To update Memoria:
 
-git pull
-docker compose up -d --build
+git pull  
+./create-container-test.sh  
 
----
-
-## Security
-
-Memoria is a self-hosted tool and should be treated as an internal/private application.
-
-Recommended:
-
-- put it behind a reverse proxy if needed
-- restrict external access
-- do not expose it publicly without protection
-- always change the default SECRET_KEY
-- avoid sharing screenshots that expose tokens or API keys
+The container will be rebuilt with the latest version.
 
 ---
 
-## Known limitations
+## Troubleshooting
 
-- The scheduler is embedded in the application container
-- Only one active Memoria instance should run against the same database when automation is enabled
-- SQLite is used by default
-- Large Plex libraries may result in longer scans and matching operations
-- Some actions depend on the scheduler being enabled
+If something doesn’t work:
 
----
+- Check container logs  
+docker logs memoria  
 
-## What Memoria does not do
-
-- It does not modify your media files
-- It does not delete your media
-- It only creates, updates, or removes Plex collections based on matches found in your libraries
+- Verify:
+  - Plex connection  
+  - TMDB API key  
+  - Arr services availability  
 
 ---
 
-## Project status
+## Roadmap
 
-Memoria is under active development. The core workflow is already usable, but improvements and refinements are still ongoing.
-
-Planned and ongoing areas include:
-
-- matching improvements
-- UI polish
-- scheduler and background task robustness
-- better publication/readiness for public release
+- Improved matching accuracy  
+- Better UI monitoring  
+- Advanced filtering and rules  
+- Performance optimizations  
 
 ---
 
 ## Contributing
 
-Contributions, feedback, and issue reports are welcome.
+Contributions are welcome.
 
-If you open an issue, include:
-
-- your Memoria version
-- your Docker setup
-- logs
-- steps to reproduce the issue
+If you find bugs or want to improve the project, feel free to open an issue or submit a pull request.
 
 ---
 
 ## License
 
-MIT License
-
-A LICENSE file should be included at the root of the repository.
+This project is open-source.  
+License details will be added soon.

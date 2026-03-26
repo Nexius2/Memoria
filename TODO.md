@@ -106,7 +106,6 @@
 
 ## UI / UX polish
 
-- [ ] Replace bulk action buttons with a cleaner single action selector + apply button
 - [ ] Improve table density / readability on People page
 - [ ] Add clearer separation between filters and data actions across the app
 - [ ] Add consistent iconography where useful
