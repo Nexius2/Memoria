@@ -1,7 +1,9 @@
 from collections import Counter
 from datetime import date, timedelta
+import csv
+import io
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, Response
 from sqlalchemy.orm import joinedload
 from ..utils.country_utils import normalize_country_label
 from ..services.collection_service import sync_event
@@ -53,6 +55,7 @@ def _upsert_person_from_candidate(candidate: DetectionCandidate) -> tuple[Person
             source_url=candidate.source_url,
             imdb_id=candidate.imdb_id,
             wikidata_id=candidate.wikidata_id,
+            web_priority=int(candidate.popularity_score or 0),
         )
         db.session.add(person)
         db.session.flush()
@@ -80,6 +83,11 @@ def _upsert_person_from_candidate(candidate: DetectionCandidate) -> tuple[Person
         changed = True
     if person.wikidata_id != candidate.wikidata_id:
         person.wikidata_id = candidate.wikidata_id
+        changed = True
+
+    candidate_priority = int(candidate.popularity_score or 0)
+    if int(person.web_priority or 0) != candidate_priority:
+        person.web_priority = candidate_priority
         changed = True
 
     return person, changed
@@ -480,8 +488,11 @@ def dashboard():
 
     events = _sort_dashboard_events(events, sort_by)
 
+    min_people_priority_display = int(settings.min_people_priority_display or 0)
+
     recent_candidates = (
         DetectionCandidate.query
+        .filter(DetectionCandidate.popularity_score >= min_people_priority_display)
         .order_by(
             DetectionCandidate.popularity_score.desc(),
             DetectionCandidate.death_date.desc(),
@@ -496,9 +507,12 @@ def dashboard():
     if not candidate_rows:
         fallback_people = (
             Person.query
-            .filter_by(source='web')
+            .filter(
+                Person.source == 'web',
+                Person.web_priority >= min_people_priority_display,
+            )
             .options(joinedload(Person.events))
-            .order_by(Person.death_date.desc(), Person.created_at.desc())
+            .order_by(Person.web_priority.desc(), Person.death_date.desc(), Person.created_at.desc())
             .limit(12)
             .all()
         )
@@ -665,6 +679,77 @@ def logs():
         source=source,
         date_from=date_from_raw,
         date_to=date_to_raw,
+    )
+
+@bp.get('/logs/export')
+def export_logs():
+    level = (request.args.get('level') or 'all').strip()
+    source = (request.args.get('source') or 'all').strip()
+    date_from_raw = (request.args.get('date_from') or '').strip()
+    date_to_raw = (request.args.get('date_to') or '').strip()
+
+    query = AppLog.query.order_by(AppLog.created_at.desc(), AppLog.id.desc())
+
+    if level != 'all':
+        query = query.filter(AppLog.level == level)
+
+    if source != 'all':
+        query = query.filter(AppLog.source == source)
+
+    if date_from_raw:
+        try:
+            date_from_value = date.fromisoformat(date_from_raw)
+            query = query.filter(AppLog.created_at >= date_from_value)
+        except ValueError:
+            date_from_raw = ''
+
+    if date_to_raw:
+        try:
+            date_to_value = date.fromisoformat(date_to_raw) + timedelta(days=1)
+            query = query.filter(AppLog.created_at < date_to_value)
+        except ValueError:
+            date_to_raw = ''
+
+    raw_log_rows = query.all()
+    log_rows = _build_app_logs_rows(raw_log_rows)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        'id',
+        'created_at',
+        'level',
+        'source',
+        'message',
+        'details',
+        'related_type',
+        'related_id',
+        'related_label',
+    ])
+
+    for row in log_rows:
+        writer.writerow([
+            row['id'],
+            row['created_at'].strftime('%Y-%m-%d %H:%M:%S') if row['created_at'] else '',
+            row['level'],
+            row['source'],
+            row['message'],
+            row['details'] or '',
+            row['related_type'] or '',
+            row['related_id'] or '',
+            row['related_label'] or '',
+        ])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return Response(
+        csv_content,
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': 'attachment; filename=memoria_logs.csv'
+        },
     )
 
 @bp.post('/actions/run-detection')

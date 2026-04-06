@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_secret_fields.html' import secret_input_attrs %}
 
 {% block title %}Arr Servers{% endblock %}
 {% block header_title %}Arr{% endblock %}
@@ -21,7 +22,14 @@
       </div>
     </div>
 
-    <form method="post" action="{{ url_for('arr.create_arr') }}" class="space-y-4">
+    <form
+      method="post"
+      action="{{ url_for('arr.create_arr') }}"
+      class="space-y-4 relative"
+      autocomplete="off"
+      data-form-type="other"
+    >
+
       <div>
         <label class="field-label">Name</label>
         <input
@@ -58,13 +66,21 @@
         <label class="field-label">API key</label>
         <div class="flex gap-2">
           <input
+            id="arr-add-api-key-input"
             class="field"
-            type="text"
             name="api_key"
             value="{{ form.get('api_key', '') }}"
             placeholder="xxxxxxxxxxxxxxxx"
+            {{ secret_input_attrs() }}
             required
           >
+          <button
+            type="button"
+            class="btn-secondary whitespace-nowrap"
+            data-secret-toggle="arr-add-api-key-input"
+          >
+            Show
+          </button>
           <button
             type="submit"
             formaction="{{ url_for('arr.test_fill') }}"
@@ -240,14 +256,34 @@
                   </div>
 
                   <div>
-                    <div class="text-emerald-200/60">Quality profile ID</div>
-                    <div class="text-white">{{ arr.quality_profile_id }}</div>
+                    <div class="text-emerald-200/60">Quality profile</div>
+                    <div class="{% if arr.quality_profile_missing %}text-rose-400 font-semibold{% else %}text-white{% endif %}">
+                      {% if arr.quality_profile_name %}
+                        {{ arr.quality_profile_name }} <span class="text-emerald-200/50">(ID {{ arr.quality_profile_id }})</span>
+                      {% elif arr.quality_profile_id %}
+                        {% if arr.quality_profile_missing %}⚠ Missing{% else %}{{ arr.quality_profile_id }}{% endif %}
+                        <span class="text-emerald-200/50">(ID {{ arr.quality_profile_id }})</span>
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
                   </div>
 
-                  <div>
-                    <div class="text-emerald-200/60">Language profile ID</div>
-                    <div class="text-white">{{ arr.language_profile_id or '—' }}</div>
-                  </div>
+                  {% if arr.kind == 'sonarr' %}
+                    <div>
+                      <div class="text-emerald-200/60">Language profile</div>
+                      <div class="{% if arr.language_profile_missing %}text-rose-400 font-semibold{% else %}text-white{% endif %}">
+                        {% if arr.language_profile_name %}
+                          {{ arr.language_profile_name }} <span class="text-emerald-200/50">(ID {{ arr.language_profile_id }})</span>
+                        {% elif arr.language_profile_id %}
+                          {% if arr.language_profile_missing %}⚠ Missing{% else %}{{ arr.language_profile_id }}{% endif %}
+                          <span class="text-emerald-200/50">(ID {{ arr.language_profile_id }})</span>
+                        {% else %}
+                          —
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endif %}
 
                   <div>
                     <div class="text-emerald-200/60">Search on add</div>
@@ -269,6 +305,17 @@
               </div>
 
               <div class="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  class="btn-secondary arr-toggle"
+                  data-target="arr-edit-{{ arr.id }}"
+                  data-arrow="arr-edit-arrow-{{ arr.id }}"
+                  aria-expanded="false"
+                  aria-controls="arr-edit-{{ arr.id }}"
+                >
+                  Edit <span id="arr-edit-arrow-{{ arr.id }}">▼</span>
+                </button>
+
                 <form
                   method="post"
                   action="{{ url_for('arr.delete_arr', arr_id=arr.id) }}"
@@ -282,6 +329,138 @@
                   </button>
                 </form>
               </div>
+            </div>
+
+            <div
+              id="arr-edit-{{ arr.id }}"
+              class="hidden mt-4 rounded-2xl border border-emerald-400/10 bg-emerald-950/30 p-4"
+            >
+              <h3 class="text-sm font-semibold text-white mb-4">Edit Arr server</h3>
+
+              <form
+                method="post"
+                action="{{ url_for('arr.update_arr', arr_id=arr.id) }}"
+                class="grid grid-cols-1 md:grid-cols-2 gap-4 relative"
+                autocomplete="off"
+                data-form-type="other"
+              >
+
+                <div>
+                  <label class="field-label">Name</label>
+                  <input class="field" type="text" name="name" value="{{ arr.name }}" required>
+                </div>
+
+                <div>
+                  <label class="field-label">Type</label>
+                  <select class="field" name="kind" required>
+                    <option value="radarr" {% if arr.kind == 'radarr' %}selected{% endif %}>Radarr</option>
+                    <option value="sonarr" {% if arr.kind == 'sonarr' %}selected{% endif %}>Sonarr</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="field-label">Base URL</label>
+                  <input class="field" type="text" name="base_url" value="{{ arr.base_url }}" required>
+                </div>
+
+                <div>
+                  <label class="field-label">API key</label>
+                  <div class="flex gap-2">
+                    <input
+                      id="arr-edit-api-key-input-{{ arr.id }}"
+                      class="field"
+                      name="api_key"
+                      value="{{ arr.api_key }}"
+                      {{ secret_input_attrs() }}
+                      required
+                    >
+                    <button
+                      type="button"
+                      class="btn-secondary whitespace-nowrap"
+                      data-secret-toggle="arr-edit-api-key-input-{{ arr.id }}"
+                    >
+                      Show
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="field-label">Root folder</label>
+                  <input class="field" type="text" name="root_folder" value="{{ arr.root_folder }}" required>
+                </div>
+
+                <div>
+                  <label class="field-label">Quality profile</label>
+                  {% if arr.available_quality_profiles %}
+                    <select
+                      class="field {% if arr.quality_profile_missing %}!text-rose-400 border-rose-400/40 focus:border-rose-400{% endif %}"
+                      name="quality_profile_id"
+                      required
+                    >
+                      {% for profile in arr.available_quality_profiles %}
+                        <option
+                          value="{{ profile.id }}"
+                          {% if arr.quality_profile_id == profile.id %}selected{% endif %}
+                        >
+                          {{ profile.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    {% if arr.quality_profile_missing %}
+                      <p class="mt-2 text-sm text-rose-400">
+                        The currently saved quality profile no longer exists in Arr. Please select a new one.
+                      </p>
+                    {% endif %}
+                  {% else %}
+                    <input class="field" type="number" name="quality_profile_id" value="{{ arr.quality_profile_id }}" required>
+                  {% endif %}
+                </div>
+
+                {% if arr.kind == 'sonarr' %}
+                  <div>
+                    <label class="field-label">Language profile</label>
+                    {% if arr.available_language_profiles %}
+                      <select
+                        class="field {% if arr.language_profile_missing %}!text-rose-400 border-rose-400/40 focus:border-rose-400{% endif %}"
+                        name="language_profile_id"
+                      >
+                        <option value="">None</option>
+                        {% for profile in arr.available_language_profiles %}
+                          <option
+                            value="{{ profile.id }}"
+                            {% if arr.language_profile_id == profile.id %}selected{% endif %}
+                          >
+                            {{ profile.name }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                      {% if arr.language_profile_missing %}
+                        <p class="mt-2 text-sm text-rose-400">
+                          The currently saved language profile no longer exists in Arr. Please select a new one.
+                        </p>
+                      {% endif %}
+                    {% else %}
+                      <input class="field" type="number" name="language_profile_id" value="{{ arr.language_profile_id or '' }}">
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <input type="hidden" name="language_profile_id" value="">
+                {% endif %}
+
+                <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+                  <input type="checkbox" name="search_on_add" {% if arr.search_on_add %}checked{% endif %}>
+                  Search on add
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-emerald-100/80">
+                  <input type="checkbox" name="enabled" {% if arr.enabled %}checked{% endif %}>
+                  Enabled
+                </label>
+
+                <div class="md:col-span-2 flex justify-end">
+                  <button type="submit" class="btn-primary">Save Arr server</button>
+                </div>
+              </form>
             </div>
           </div>
         {% endfor %}
@@ -418,5 +597,119 @@
     </table>
   </div>
 </div>
+<div
+  id="arr-error-modal"
+  class="fixed inset-0 z-50 hidden"
+  aria-hidden="true"
+>
+  <div class="absolute inset-0 bg-black/70"></div>
+
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="w-full max-w-xl rounded-2xl border border-rose-400/20 bg-slate-950 shadow-2xl overflow-hidden">
+      <div class="px-6 py-5 border-b border-rose-400/10">
+        <h3 id="arr-error-modal-title" class="text-xl font-semibold text-white">
+          {{ arr_modal_error_title or 'Error' }}
+        </h3>
+      </div>
+
+      <div class="px-6 py-5">
+        <p id="arr-error-modal-message" class="text-sm text-emerald-100/80 leading-6">
+          {{ arr_modal_error_message or '' }}
+        </p>
+      </div>
+
+      <div class="px-6 py-4 border-t border-rose-400/10 flex justify-end">
+        <button
+          type="button"
+          id="arr-error-modal-close"
+          class="btn-primary"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  function openArrEditor(editorId) {
+    if (!editorId) return;
+
+    const content = document.getElementById(`arr-edit-${editorId}`);
+    const arrow = document.getElementById(`arr-edit-arrow-${editorId}`);
+    const button = document.querySelector(`.arr-toggle[data-target="arr-edit-${editorId}"]`);
+
+    if (!content || !arrow || !button) return;
+
+    content.classList.remove('hidden');
+    arrow.textContent = '▲';
+    button.setAttribute('aria-expanded', 'true');
+
+    content.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  document.querySelectorAll('.arr-toggle').forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.getAttribute('data-target');
+      const arrowId = button.getAttribute('data-arrow');
+
+      const content = document.getElementById(targetId);
+      const arrow = document.getElementById(arrowId);
+
+      if (!content || !arrow) return;
+
+      const isHidden = content.classList.contains('hidden');
+
+      if (isHidden) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+        button.setAttribute('aria-expanded', 'true');
+      } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+        button.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+
+  const openEditId = {{ arr_open_edit_id|tojson if arr_open_edit_id is defined else 'null' }};
+  if (openEditId) {
+    openArrEditor(openEditId);
+  }
+
+  const errorModal = document.getElementById('arr-error-modal');
+  const errorModalClose = document.getElementById('arr-error-modal-close');
+  const hasModalError = {{ (arr_modal_error_message is defined and arr_modal_error_message)|tojson }};
+
+  function closeArrErrorModal() {
+    if (!errorModal) return;
+    errorModal.classList.add('hidden');
+    errorModal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (errorModal && hasModalError) {
+    errorModal.classList.remove('hidden');
+    errorModal.setAttribute('aria-hidden', 'false');
+  }
+
+  if (errorModalClose) {
+    errorModalClose.addEventListener('click', closeArrErrorModal);
+  }
+
+  if (errorModal) {
+    errorModal.addEventListener('click', (event) => {
+      if (event.target === errorModal || event.target === errorModal.firstElementChild) {
+        closeArrErrorModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && errorModal && !errorModal.classList.contains('hidden')) {
+      closeArrErrorModal();
+    }
+  });
+});
+</script>
 
 {% endblock %}

@@ -44,6 +44,10 @@
 - [x] Auto-submit filters UI improvement
 - [x] Cleaner bulk actions UI block
 - [x] Better centered status badges in people table
+- [x] Minimum people priority level saved in settings
+- [x] Minimum people priority level applied consistently on dashboard candidates
+- [x] Minimum people priority level applied consistently on People page for web-created people
+- [x] Web candidate priority persisted on Person records
 
 ---
 
@@ -111,6 +115,7 @@
 - [ ] Add consistent iconography where useful
 - [ ] Review spacing and alignment on all list/table pages
 - [ ] Make reset/filter micro-interactions consistent across pages
+- [ ] Show effective web priority more clearly in People / Dashboard UI
 
 ---
 

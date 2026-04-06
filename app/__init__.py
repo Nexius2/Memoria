@@ -53,6 +53,11 @@ def _ensure_runtime_schema():
             "ALTER TABLE app_settings ADD COLUMN auto_arr_enabled BOOLEAN NOT NULL DEFAULT 1"
         )
 
+    if 'min_people_priority_display' not in existing_columns:
+        alter_statements.append(
+            "ALTER TABLE app_settings ADD COLUMN min_people_priority_display INTEGER NOT NULL DEFAULT 25"
+        )
+
     if 'person' in table_names:
         person_columns = {
             column['name']
@@ -87,6 +92,16 @@ def _ensure_runtime_schema():
         if 'missing_titles_scanned_at' not in person_columns:
             alter_statements.append(
                 "ALTER TABLE person ADD COLUMN missing_titles_scanned_at DATETIME"
+            )
+
+        if 'web_priority' not in person_columns:
+            alter_statements.append(
+                "ALTER TABLE person ADD COLUMN web_priority INTEGER NOT NULL DEFAULT 0"
+            )
+
+        if 'force_publish' not in person_columns:
+            alter_statements.append(
+                "ALTER TABLE person ADD COLUMN force_publish BOOLEAN NOT NULL DEFAULT 0"
             )
 
     if 'library_target' in table_names:

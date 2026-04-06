@@ -82,6 +82,81 @@
   </div>
 
   <div class="space-y-6 xl:col-span-1">
+    {% if settings.tmdb_api_key %}
+      <div class="panel">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-xl font-semibold text-white">TMDb matching</h3>
+            <p class="text-sm text-emerald-200/70 mt-1">
+              {% if person.tmdb_person_id %}
+                This person is currently linked to TMDb. You can clear it and pick another match manually.
+              {% else %}
+                Review the suggested TMDb candidates below and pick the correct person manually.
+              {% endif %}
+            </p>
+          </div>
+
+          <form
+            method="post"
+            action="{{ url_for('people.rematch_tmdb', person_id=person.id) }}"
+            class="shrink-0"
+          >
+            <button type="submit" class="btn-secondary">
+              {% if person.tmdb_person_id %}Re-match TMDb{% else %}Refresh candidates{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+          {% if person.tmdb_person_id %}
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-emerald-200/60 mb-2">Current link</div>
+                <div class="text-white font-medium">
+                  {{ (tmdb_match.name if tmdb_match else none) or person.name }}
+                </div>
+                <div class="mt-1 text-sm text-emerald-100/70">
+                  TMDb #{{ person.tmdb_person_id }}
+                  {% if tmdb_match and tmdb_match.known_for_department %}
+                    · {{ tmdb_match.known_for_department }}
+                  {% endif %}
+                  {% if tmdb_match and tmdb_match.deathday %}
+                    · Death date: {{ tmdb_match.deathday }}
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if person.tmdb_person_id %}
+                <a
+                  href="https://www.themoviedb.org/person/{{ person.tmdb_person_id }}"
+                  target="_blank"
+                  class="text-sm text-emerald-300 hover:text-white"
+                >
+                  Open on TMDb
+                </a>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-emerald-200/60 mb-2">Resolution needed</div>
+                <div class="text-white font-medium">No TMDb link selected yet</div>
+                <div class="mt-1 text-sm text-emerald-100/70">
+                  {{ tmdb_candidates|length }} candidate{{ 's' if tmdb_candidates|length != 1 else '' }} ready for manual selection.
+                </div>
+              </div>
+
+              {% if tmdb_match %}
+                <div class="px-3 py-2 rounded-xl border border-sky-400/20 bg-sky-500/10 text-sm text-sky-100">
+                  Suggested auto-match: {{ tmdb_match.name }}{% if tmdb_match.id %} · #{{ tmdb_match.id }}{% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
     <div class="panel">
       <h3 class="text-xl font-semibold text-white mb-4">Selection control</h3>
 
@@ -97,7 +172,7 @@
           >
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label class="flex items-center gap-2 text-sm text-emerald-100/80">
             <input type="checkbox" name="is_pinned" value="1" {% if person.is_pinned %}checked{% endif %}>
             Pin this person
@@ -106,6 +181,11 @@
           <label class="flex items-center gap-2 text-sm text-emerald-100/80">
             <input type="checkbox" name="exclude_from_auto" value="1" {% if person.exclude_from_auto %}checked{% endif %}>
             Exclude from auto selection
+          </label>
+
+          <label class="flex items-center gap-2 text-sm text-amber-100/90">
+            <input type="checkbox" name="force_publish" value="1" {% if person.force_publish %}checked{% endif %}>
+            Force publish on Plex
           </label>
         </div>
 
@@ -409,6 +489,12 @@
                   <div class="flex flex-wrap items-center gap-2">
                     <div class="text-white font-medium">{{ candidate.name }}</div>
                     <span class="text-xs text-emerald-200/60">TMDb #{{ candidate.id }}</span>
+
+                    {% if tmdb_match and tmdb_match.id == candidate.id %}
+                      <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-sky-500/10 text-sky-200 border border-sky-400/20">
+                        suggested
+                      </span>
+                    {% endif %}
 
                     {% if candidate.match_score is not none %}
                       <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-sky-500/10 text-sky-200 border border-sky-400/20">

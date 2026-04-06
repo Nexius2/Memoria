@@ -16,6 +16,7 @@ class AppSettings(db.Model, TimestampMixin):
     detection_window_days = db.Column(db.Integer, default=2, nullable=False)
     display_days = db.Column(db.Integer, default=7, nullable=False)
     max_people = db.Column(db.Integer, default=2, nullable=False)
+    min_people_priority_display = db.Column(db.Integer, default=25, nullable=False)
     countries_csv = db.Column(db.Text, default='France,United States,United Kingdom', nullable=False)
     professions_csv = db.Column(db.Text, default='actor,actress,director', nullable=False)
     publish_on_home = db.Column(db.Boolean, default=True, nullable=False)
@@ -133,8 +134,10 @@ class Person(db.Model, TimestampMixin):
     notes = db.Column(db.Text, nullable=True)
 
     manual_priority = db.Column(db.Integer, nullable=True)
+    web_priority = db.Column(db.Integer, default=0, nullable=False)
     is_pinned = db.Column(db.Boolean, default=False, nullable=False)
     exclude_from_auto = db.Column(db.Boolean, default=False, nullable=False)
+    force_publish = db.Column(db.Boolean, default=False, nullable=False)
     ignore_until = db.Column(db.Date, nullable=True)
     selection_note = db.Column(db.Text, nullable=True)
 

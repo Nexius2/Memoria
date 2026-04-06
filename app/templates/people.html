@@ -55,10 +55,12 @@
     {% endif %}
 
     <div class="flex flex-col gap-4 mb-4">
-      <div class="flex items-center justify-between gap-4">
-        <h2 class="text-xl font-semibold text-white">Known people</h2>
-        <div class="text-xs text-emerald-200/60">{{ person_rows|length }} shown</div>
-      </div>
+	<div class="flex items-center justify-between gap-4">
+	  <h2 class="text-xl font-semibold text-white">Known people</h2>
+	  <div class="text-xs text-emerald-200/60">
+		{{ page_rows_start }}–{{ page_rows_end }} / {{ total_people_count }} shown
+	  </div>
+	</div>
 
       <form
         id="people-filters-form"
@@ -135,13 +137,14 @@
       </form>
     </div>
 
-    <form id="people-bulk-form" method="post" action="{{ url_for('people.bulk_action') }}">
-      <input type="hidden" name="q" value="{{ q or '' }}">
-      <input type="hidden" name="status" value="{{ status_filter }}">
-      <input type="hidden" name="source" value="{{ source_filter }}">
-      <input type="hidden" name="missing" value="{{ missing_filter }}">
-      <input type="hidden" name="sort" value="{{ sort_by }}">
-      <input type="hidden" name="bulk_action" id="bulk-action-input" value="">
+	<form id="people-bulk-form" method="post" action="{{ url_for('people.bulk_action') }}">
+	  <input type="hidden" name="q" value="{{ q or '' }}">
+	  <input type="hidden" name="status" value="{{ status_filter }}">
+	  <input type="hidden" name="source" value="{{ source_filter }}">
+	  <input type="hidden" name="missing" value="{{ missing_filter }}">
+	  <input type="hidden" name="sort" value="{{ sort_by }}">
+	  <input type="hidden" name="page" value="{{ page }}">
+	  <input type="hidden" name="bulk_action" id="bulk-action-input" value="">
 
       <div class="mb-4 rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -190,24 +193,25 @@
             <th class="py-3">Country</th>
             <th class="py-3">Source</th>
             <th class="py-3">Missing titles</th>
-            <th class="py-3">In event</th>
             <th class="py-3">Days left</th>
             <th class="py-3">Status</th>
-            <th class="py-3 text-right">Actions</th>
           </tr>
           </thead>
           <tbody>
           {% for row in person_rows %}
             {% set person = row.person %}
-            <tr class="border-b border-emerald-400/5 align-top">
+            <tr
+              class="border-b border-emerald-400/5 align-top cursor-pointer hover:bg-emerald-400/5 transition-colors"
+              data-person-url="{{ url_for('people.detail', person_id=person.id) }}"
+            >
               <td class="py-3 pr-3">
                 <input class="people-checkbox" type="checkbox" name="person_ids" value="{{ person.id }}">
               </td>
 
               <td class="py-3">
-                <a class="text-white hover:text-emerald-300 font-semibold" href="{{ url_for('people.detail', person_id=person.id) }}">
+                <span class="text-white font-semibold">
                   {{ person.name }}
-                </a>
+                </span>
 
                 <div class="mt-2 flex flex-wrap gap-2">
                   {% if row.status == 'active_event' %}
@@ -227,6 +231,12 @@
                   {% if row.is_pinned %}
                     <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-violet-500/20 text-violet-200 border border-violet-400/20">
                       Pinned
+                    </span>
+                  {% endif %}
+
+                  {% if row.is_forced %}
+                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-200 border border-amber-400/20">
+                      Forced publish
                     </span>
                   {% endif %}
 
@@ -301,13 +311,7 @@
                 </div>
               </td>
 
-              <td class="py-3">
-                {% if row.active_event %}
-                  <div class="text-emerald-100/80">{{ row.in_event_label }}</div>
-                {% else %}
-                  <div class="text-emerald-100/60">—</div>
-                {% endif %}
-              </td>
+
 
               <td class="py-3">
                 {% if row.days_left is not none %}
@@ -331,20 +335,11 @@
                 {% endif %}
               </td>
 
-              <td class="py-3 text-right">
-                <div class="flex justify-end gap-2">
-                  <a
-                    href="{{ url_for('people.detail', person_id=person.id) }}"
-                    class="btn-secondary"
-                  >
-                    Open
-                  </a>
-                </div>
-              </td>
+
             </tr>
           {% else %}
             <tr>
-              <td colspan="10" class="py-8 text-center text-emerald-200/60">
+              <td colspan="8" class="py-8 text-center text-emerald-200/60">
                 No people match the current filters.
               </td>
             </tr>
@@ -353,6 +348,37 @@
         </table>
       </div>
     </form>
+
+    <div class="mt-4 flex items-center justify-between gap-3">
+      <div class="text-xs text-emerald-200/60">
+        Page {{ page }} / {{ total_pages }}
+      </div>
+
+      <div class="flex items-center gap-2">
+        {% if page > 1 %}
+          <a
+            class="btn-secondary"
+            href="{{ url_for('people.index', status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page-1) }}"
+          >
+            Previous
+          </a>
+        {% else %}
+          <span class="btn-secondary opacity-50 pointer-events-none">Previous</span>
+        {% endif %}
+
+        {% if page < total_pages %}
+          <a
+            class="btn-secondary"
+            href="{{ url_for('people.index', status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page+1) }}"
+          >
+            Next
+          </a>
+        {% else %}
+          <span class="btn-secondary opacity-50 pointer-events-none">Next</span>
+        {% endif %}
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -389,6 +415,26 @@
       });
     });
 
+    document.querySelectorAll('tr[data-person-url]').forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (
+          event.target.closest('input') ||
+          event.target.closest('button') ||
+          event.target.closest('a') ||
+          event.target.closest('label') ||
+          event.target.closest('select') ||
+          event.target.closest('textarea')
+        ) {
+          return;
+        }
+
+        const url = row.dataset.personUrl;
+        if (url) {
+          window.location.href = url;
+        }
+      });
+    });
+
     if (bulkForm) {
       bulkForm.addEventListener('submit', (event) => {
         const checked = checkboxes.filter((checkbox) => checkbox.checked);
@@ -416,10 +462,6 @@
           if (saved) {
             let shouldSubmit = false;
 
-            if (qField && saved.q !== undefined && qField.value !== saved.q) {
-              qField.value = saved.q;
-              shouldSubmit = true;
-            }
             if (statusField && saved.status && statusField.value !== saved.status) {
               statusField.value = saved.status;
               shouldSubmit = true;
@@ -450,7 +492,6 @@
       filtersForm.addEventListener('submit', () => {
         try {
           localStorage.setItem(filtersStorageKey, JSON.stringify({
-            q: qField ? qField.value : '',
             status: statusField ? statusField.value : 'all',
             source: sourceField ? sourceField.value : 'all',
             missing: missingField ? missingField.value : 'all',

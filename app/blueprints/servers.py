@@ -135,6 +135,19 @@ def create_server():
 
     return redirect(url_for('servers.index'))
 
+@bp.post('/<int:server_id>/update')
+def update_server(server_id: int):
+    server = PlexServer.query.get_or_404(server_id)
+
+    server.name = request.form['name'].strip()
+    server.base_url = request.form['base_url'].strip()
+    server.token = request.form['token'].strip()
+    server.verify_ssl = request.form.get('verify_ssl') == 'on'
+    server.enabled = request.form.get('enabled') == 'on'
+
+    db.session.commit()
+    flash('Plex server updated.', 'success')
+    return redirect(url_for('servers.index'))
 
 @bp.post('/<int:server_id>/delete')
 def delete_server(server_id: int):

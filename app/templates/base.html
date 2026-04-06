@@ -153,6 +153,33 @@
         node.textContent = formatLocalDateTime(isoValue, withSeconds);
       });
 
+      document.querySelectorAll('[data-secret-toggle]').forEach((button) => {
+        const inputId = button.dataset.secretToggle;
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        const setMasked = (masked) => {
+          if (masked) {
+            input.setAttribute('data-secret-masked', '1');
+          } else {
+            input.removeAttribute('data-secret-masked');
+          }
+        };
+
+        const isMasked = () => input.hasAttribute('data-secret-masked');
+
+        const setLabel = () => {
+          button.textContent = isMasked() ? 'Show' : 'Hide';
+        };
+
+        button.addEventListener('click', () => {
+          setMasked(!isMasked());
+          setLabel();
+        });
+
+        setLabel();
+      });
+
       const modal = document.getElementById('confirm-modal');
       const modalTitle = document.getElementById('confirm-modal-title');
       const modalMessage = document.getElementById('confirm-modal-message');

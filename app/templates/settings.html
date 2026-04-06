@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_secret_fields.html' import secret_input_attrs %}
 {% block content %}
 <div class="panel max-w-4xl mx-auto">
   <div class="flex items-start justify-between gap-4 mb-6">
@@ -14,7 +15,9 @@
   <form
     method="post"
     action="{{ url_for('settings.save') }}"
-    class="settings-autosave-form grid grid-cols-1 md:grid-cols-2 gap-4"
+    class="settings-autosave-form grid grid-cols-1 md:grid-cols-2 gap-4 relative"
+    autocomplete="off"
+    data-form-type="other"
   >
     <input type="hidden" name="_autosave" value="1">
 
@@ -26,7 +29,22 @@
 
     <div>
       <label class="field-label">TMDb API key</label>
-      <input class="field" type="text" name="tmdb_api_key" value="{{ settings.tmdb_api_key or '' }}">
+      <div class="flex gap-2">
+        <input
+          id="tmdb-api-key-input"
+          class="field"
+          name="tmdb_api_key"
+          value="{{ settings.tmdb_api_key or '' }}"
+          {{ secret_input_attrs() }}
+        >
+        <button
+          type="button"
+          class="btn-secondary whitespace-nowrap"
+          data-secret-toggle="tmdb-api-key-input"
+        >
+          Show
+        </button>
+      </div>
       <div class="text-xs text-emerald-200/60 mt-1">Used to improve filmography matching and missing titles detection.</div>
     </div>
 
@@ -46,6 +64,12 @@
       <label class="field-label">Max simultaneous people *</label>
       <input class="field" type="number" min="1" name="max_people" value="{{ settings.max_people }}" required>
       <div class="text-xs text-emerald-200/60 mt-1">Maximum number of tribute events created from recent candidates. Most popular candidates are selected first.</div>
+    </div>
+
+    <div>
+      <label class="field-label">Minimum people priority level *</label>
+      <input class="field" type="number" min="0" name="min_people_priority_display" value="{{ settings.min_people_priority_display }}" required>
+      <div class="text-xs text-emerald-200/60 mt-1">Hide low-priority web candidates from the dashboard and People page unless they are pinned, manually prioritized, or already active.</div>
     </div>
 
     <div>

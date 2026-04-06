@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_secret_fields.html' import secret_input_attrs %}
 {% block content %}
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
   <div
@@ -9,7 +10,14 @@
   </div>
   <div class="panel">
     <h2 class="text-xl font-semibold text-white mb-4">Add Plex server</h2>
-    <form method="post" action="{{ url_for('servers.create_server') }}" class="space-y-4">
+    <form
+      method="post"
+      action="{{ url_for('servers.create_server') }}"
+      class="space-y-4 relative"
+      autocomplete="off"
+      data-form-type="other"
+    >
+
       <div>
         <label class="field-label">Name *</label>
         <input class="field" type="text" name="name" required>
@@ -22,7 +30,22 @@
 
       <div>
         <label class="field-label">Token *</label>
-        <input class="field" type="text" name="token" required>
+        <div class="flex gap-2">
+          <input
+            id="plex-add-token-input"
+            class="field"
+            name="token"
+            {{ secret_input_attrs() }}
+            required
+          >
+          <button
+            type="button"
+            class="btn-secondary whitespace-nowrap"
+            data-secret-toggle="plex-add-token-input"
+          >
+            Show
+          </button>
+        </div>
       </div>
 
       <label class="inline-flex items-center gap-2 text-sm">
@@ -64,6 +87,17 @@
               <button class="btn-secondary" type="submit">Refresh Plex cache</button>
             </form>
 
+            <button
+              type="button"
+              class="btn-secondary server-toggle"
+              data-target="server-edit-{{ server.id }}"
+              data-arrow="server-edit-arrow-{{ server.id }}"
+              aria-expanded="false"
+              aria-controls="server-edit-{{ server.id }}"
+            >
+              Edit <span id="server-edit-arrow-{{ server.id }}">▼</span>
+            </button>
+
 			<form
 			  method="post"
 			  action="{{ url_for('servers.delete_server', server_id=server.id) }}"
@@ -86,6 +120,67 @@
               <span id="server-arrow-{{ server.id }}">▼</span>
             </button>
           </div>
+        </div>
+
+        <div
+          id="server-edit-{{ server.id }}"
+          class="hidden mt-4 rounded-xl border border-emerald-400/10 bg-black/10 p-4"
+        >
+          <h4 class="text-sm font-semibold text-white mb-4">Edit Plex server</h4>
+
+          <form
+            method="post"
+            action="{{ url_for('servers.update_server', server_id=server.id) }}"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 relative"
+            autocomplete="off"
+            data-form-type="other"
+          >
+
+            <div>
+              <label class="field-label">Name *</label>
+              <input class="field" type="text" name="name" value="{{ server.name }}" required>
+            </div>
+
+            <div>
+              <label class="field-label">Base URL *</label>
+              <input class="field" type="text" name="base_url" value="{{ server.base_url }}" required>
+            </div>
+
+            <div class="md:col-span-2">
+              <label class="field-label">Token *</label>
+              <div class="flex gap-2">
+                <input
+                  id="plex-edit-token-input-{{ server.id }}"
+                  class="field"
+                  name="token"
+                  value="{{ server.token }}"
+                  {{ secret_input_attrs() }}
+                  required
+                >
+                <button
+                  type="button"
+                  class="btn-secondary whitespace-nowrap"
+                  data-secret-toggle="plex-edit-token-input-{{ server.id }}"
+                >
+                  Show
+                </button>
+              </div>
+            </div>
+
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" name="verify_ssl" {% if server.verify_ssl %}checked{% endif %}>
+              Verify SSL
+            </label>
+
+            <label class="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" name="enabled" {% if server.enabled %}checked{% endif %}>
+              Enabled
+            </label>
+
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="btn-primary">Save Plex server</button>
+            </div>
+          </form>
         </div>
 
         <div

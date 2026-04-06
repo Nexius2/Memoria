@@ -1,7 +1,7 @@
 from datetime import date, timedelta, datetime
 from collections import defaultdict
 import re
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from sqlalchemy.orm import joinedload
 from ..utils.country_utils import normalize_country_label
 
@@ -461,10 +461,17 @@ def _enrich_person_from_tmdb(person: Person, settings: AppSettings) -> bool:
     return True
 
 def _build_people_rows(people: list[Person]) -> list[dict]:
-    candidate_slugs = {
-        slug
-        for (slug,) in db.session.query(DetectionCandidate.slug).all()
+    candidate_rows = db.session.query(
+        DetectionCandidate.slug,
+        DetectionCandidate.popularity_score,
+    ).all()
+
+    candidate_priority_by_slug = {
+        slug: int(popularity_score or 0)
+        for slug, popularity_score in candidate_rows
     }
+
+    candidate_slugs = set(candidate_priority_by_slug.keys())
 
     rows = []
 
@@ -503,7 +510,10 @@ def _build_people_rows(people: list[Person]) -> list[dict]:
             'is_pinned': person.is_pinned,
             'is_excluded': person.exclude_from_auto,
             'is_ignored': person.is_ignored_now,
+            'is_forced': person.force_publish,
             'manual_priority': person.manual_priority,
+            'candidate_priority': candidate_priority_by_slug.get(person.slug),
+            'effective_priority': candidate_priority_by_slug.get(person.slug, int(person.web_priority or 0)),
             'in_event_label': in_event_label,
             'days_left': days_left,
             'missing_movies_count': missing_movies_count,
@@ -526,6 +536,17 @@ def index():
     missing_filter = (request.args.get('missing') or 'all').strip()
     sort_by = (request.args.get('sort') or 'death_desc').strip()
 
+    page_raw = (request.args.get('page') or '1').strip()
+    per_page = 4
+
+    try:
+        page = int(page_raw)
+    except ValueError:
+        page = 1
+
+    if page < 1:
+        page = 1
+
     people = (
         Person.query
         .options(joinedload(Person.events))
@@ -534,7 +555,6 @@ def index():
 
     person_rows = _build_people_rows(people)
     duplicate_groups = _build_duplicate_groups(people)
-    
 
     if q:
         filtered_rows = []
@@ -635,9 +655,23 @@ def index():
             reverse=True,
         )
 
+    total_people_count = len(person_rows)
+    total_pages = max((total_people_count + per_page - 1) // per_page, 1)
+
+    if page > total_pages:
+        page = total_pages
+
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page
+
+    paginated_rows = person_rows[start_index:end_index]
+
+    page_rows_start = start_index + 1 if total_people_count > 0 else 0
+    page_rows_end = min(end_index, total_people_count)
+
     return render_template(
         'people.html',
-        person_rows=person_rows,
+        person_rows=paginated_rows,
         settings=settings,
         q=q,
         status_filter=status_filter,
@@ -645,6 +679,12 @@ def index():
         missing_filter=missing_filter,
         sort_by=sort_by,
         duplicate_groups=duplicate_groups,
+        page=page,
+        per_page=per_page,
+        total_people_count=total_people_count,
+        total_pages=total_pages,
+        page_rows_start=page_rows_start,
+        page_rows_end=page_rows_end,
     )
 
 
@@ -814,6 +854,7 @@ def _merge_people(source: Person, target: Person) -> None:
 
     target.is_pinned = target.is_pinned or source.is_pinned
     target.exclude_from_auto = target.exclude_from_auto or source.exclude_from_auto
+    target.force_publish = target.force_publish or source.force_publish
 
     if target.ignore_until and source.ignore_until:
         target.ignore_until = max(target.ignore_until, source.ignore_until)
@@ -866,13 +907,50 @@ def refresh_metadata(person_id: int):
     )
     return redirect(url_for('people.detail', person_id=person.id))
 
+@bp.get('/<int:person_id>/tmdb-candidates')
+def tmdb_candidates(person_id: int):
+    person = Person.query.get_or_404(person_id)
+    settings = AppSettings.get_or_create()
+
+    if not settings.tmdb_api_key:
+        return jsonify({
+            'ok': False,
+            'message': 'TMDb API key is not configured.',
+            'candidates': [],
+        }), 400
+
+    try:
+        candidates = _get_tmdb_candidates_for_person(person, settings)
+    except Exception as exc:
+        return jsonify({
+            'ok': False,
+            'message': f'TMDb candidate lookup failed: {exc}',
+            'candidates': [],
+        }), 502
+
+    return jsonify({
+        'ok': True,
+        'person': {
+            'id': person.id,
+            'name': person.name,
+            'tmdb_person_id': person.tmdb_person_id,
+            'tmdb_manual_override': person.tmdb_manual_override,
+        },
+        'candidates': [_serialize_tmdb_candidate(candidate) for candidate in candidates],
+    })
+
+
 @bp.post('/<int:person_id>/link-tmdb')
+@bp.post('/<int:person_id>/select-tmdb-match')
 def link_tmdb(person_id: int):
     person = Person.query.get_or_404(person_id)
     settings = AppSettings.get_or_create()
 
     if not settings.tmdb_api_key:
-        flash('TMDb API key is not configured.', 'warning')
+        message = 'TMDb API key is not configured.'
+        if _wants_json_response():
+            return jsonify({'ok': False, 'message': message}), 400
+        flash(message, 'warning')
         return redirect(url_for('people.detail', person_id=person.id))
 
     tmdb_person_id_raw = (request.form.get('tmdb_person_id') or '').strip()
@@ -880,7 +958,10 @@ def link_tmdb(person_id: int):
     try:
         tmdb_person_id = int(tmdb_person_id_raw)
     except (TypeError, ValueError):
-        flash('Invalid TMDb person ID.', 'danger')
+        message = 'Invalid TMDb person ID.'
+        if _wants_json_response():
+            return jsonify({'ok': False, 'message': message}), 400
+        flash(message, 'danger')
         return redirect(url_for('people.detail', person_id=person.id))
 
     existing_person, duplicate_reason = find_existing_person_duplicate(
@@ -888,10 +969,19 @@ def link_tmdb(person_id: int):
         tmdb_person_id=tmdb_person_id,
     )
     if existing_person:
-        flash(
-            f'Cannot link this TMDb person: it is already used by "{existing_person.name}" ({duplicate_reason}).',
-            'warning',
+        message = (
+            f'Cannot link this TMDb person: it is already used by "{existing_person.name}" ({duplicate_reason}).'
         )
+        if _wants_json_response():
+            return jsonify({
+                'ok': False,
+                'message': message,
+                'existing_person': {
+                    'id': existing_person.id,
+                    'name': existing_person.name,
+                },
+            }), 409
+        flash(message, 'warning')
         return redirect(url_for('people.detail', person_id=existing_person.id))
 
     try:
@@ -901,7 +991,10 @@ def link_tmdb(person_id: int):
         enriched = _enrich_person_from_tmdb(person, settings)
         if not enriched:
             db.session.rollback()
-            flash('Selected TMDb person could not be loaded.', 'danger')
+            message = 'Selected TMDb person could not be loaded.'
+            if _wants_json_response():
+                return jsonify({'ok': False, 'message': message}), 404
+            flash(message, 'danger')
             return redirect(url_for('people.detail', person_id=person.id))
 
         existing_person, duplicate_reason = find_existing_person_duplicate(
@@ -917,19 +1010,45 @@ def link_tmdb(person_id: int):
             existing_person_id = existing_person.id
             existing_person_name = existing_person.name
             db.session.rollback()
-            flash(
-                f'Duplicate prevented: matched existing person "{existing_person_name}" ({duplicate_reason}).',
-                'warning',
+            message = (
+                f'Duplicate prevented: matched existing person "{existing_person_name}" ({duplicate_reason}).'
             )
+            if _wants_json_response():
+                return jsonify({
+                    'ok': False,
+                    'message': message,
+                    'existing_person': {
+                        'id': existing_person_id,
+                        'name': existing_person_name,
+                    },
+                }), 409
+            flash(message, 'warning')
             return redirect(url_for('people.detail', person_id=existing_person_id))
 
         db.session.commit()
         refresh_person_missing_titles(person, settings=settings)
 
-        flash(f'TMDb link updated manually for "{person.name}".', 'success')
+        success_message = f'TMDb link updated manually for "{person.name}".'
+        if _wants_json_response():
+            return jsonify({
+                'ok': True,
+                'message': success_message,
+                'person': {
+                    'id': person.id,
+                    'name': person.name,
+                    'tmdb_person_id': person.tmdb_person_id,
+                    'tmdb_manual_override': person.tmdb_manual_override,
+                    'source_url': person.source_url,
+                },
+            })
+
+        flash(success_message, 'success')
     except Exception as exc:
         db.session.rollback()
-        flash(f'TMDb manual link failed: {exc}', 'danger')
+        error_message = f'TMDb manual link failed: {exc}'
+        if _wants_json_response():
+            return jsonify({'ok': False, 'message': error_message}), 400
+        flash(error_message, 'danger')
 
     return redirect(url_for('people.detail', person_id=person.id))
 
@@ -937,6 +1056,7 @@ def link_tmdb(person_id: int):
 @bp.post('/<int:person_id>/rematch-tmdb')
 def rematch_tmdb(person_id: int):
     person = Person.query.get_or_404(person_id)
+    settings = AppSettings.get_or_create()
 
     person.tmdb_person_id = None
     person.tmdb_manual_override = False
@@ -946,10 +1066,31 @@ def rematch_tmdb(person_id: int):
 
     db.session.commit()
 
-    flash(
-        f'TMDb link cleared for "{person.name}". Review the suggested candidates below and pick the correct one.',
-        'success',
+    candidates = []
+    if settings.tmdb_api_key:
+        try:
+            candidates = _get_tmdb_candidates_for_person(person, settings)
+        except Exception:
+            candidates = []
+
+    success_message = (
+        f'TMDb link cleared for "{person.name}". Review the suggested candidates below and pick the correct one.'
     )
+
+    if _wants_json_response():
+        return jsonify({
+            'ok': True,
+            'message': success_message,
+            'person': {
+                'id': person.id,
+                'name': person.name,
+                'tmdb_person_id': person.tmdb_person_id,
+                'tmdb_manual_override': person.tmdb_manual_override,
+            },
+            'candidates': [_serialize_tmdb_candidate(candidate) for candidate in candidates],
+        })
+
+    flash(success_message, 'success')
     return redirect(url_for('people.detail', person_id=person.id))
 
 @bp.post('/<int:person_id>/refresh-missing-titles')
@@ -1155,6 +1296,44 @@ def bulk_action():
 
     return redirect(url_for('people.index', **redirect_kwargs))
 
+def _serialize_tmdb_candidate(candidate: dict) -> dict:
+    return {
+        'id': candidate.get('id'),
+        'name': candidate.get('name'),
+        'match_score': candidate.get('match_score'),
+        'match_popularity': candidate.get('match_popularity'),
+        'deathday': candidate.get('deathday'),
+        'known_for_department': candidate.get('known_for_department'),
+        'also_known_as': candidate.get('also_known_as') or [],
+        'profile_image_url': candidate.get('profile_image_url'),
+        'source_url': (
+            f"https://www.themoviedb.org/person/{candidate.get('id')}"
+            if candidate.get('id') else None
+        ),
+    }
+
+
+def _wants_json_response() -> bool:
+    if request.args.get('format') == 'json':
+        return True
+
+    accept = (request.headers.get('Accept') or '').lower()
+    requested_with = (request.headers.get('X-Requested-With') or '').lower()
+    return 'application/json' in accept or requested_with == 'xmlhttprequest'
+
+
+def _get_tmdb_candidates_for_person(person: Person, settings: AppSettings, *, limit: int = 5) -> list[dict]:
+    if not settings.tmdb_api_key:
+        return []
+
+    tmdb = TmdbService(settings.tmdb_api_key)
+    return tmdb.search_person_candidates(
+        person.name,
+        death_date=person.death_date.isoformat() if person.death_date else None,
+        limit=limit,
+    )
+
+
 def _load_tmdb_context(person: Person, settings: AppSettings):
     tmdb_match = None
     tmdb_credits = {'cast': [], 'crew': []}
@@ -1163,43 +1342,33 @@ def _load_tmdb_context(person: Person, settings: AppSettings):
         return tmdb_match, tmdb_credits
 
     tmdb = TmdbService(settings.tmdb_api_key)
+    tmdb_person_id = person.tmdb_person_id
 
-    if not person.tmdb_person_id:
+    if not tmdb_person_id:
         tmdb_match = tmdb.search_person(
             person.name,
             death_date=person.death_date.isoformat() if person.death_date else None,
         )
-        if tmdb_match:
-            person.tmdb_person_id = tmdb_match.get('id')
-            db.session.commit()
+        tmdb_person_id = (tmdb_match or {}).get('id')
 
-    if person.tmdb_person_id:
-        tmdb_credits = tmdb.person_credits(person.tmdb_person_id)
+    if tmdb_person_id:
+        tmdb_credits = tmdb.person_credits(tmdb_person_id)
 
     return tmdb_match, tmdb_credits
 
-def _load_tmdb_person_photo(person: Person, settings: AppSettings) -> str | None:
+
+def _load_tmdb_person_photo(person: Person, settings: AppSettings, tmdb_match: dict | None = None) -> str | None:
     if not settings.tmdb_api_key:
         return None
 
     try:
         tmdb = TmdbService(settings.tmdb_api_key)
+        tmdb_person_id = person.tmdb_person_id or (tmdb_match or {}).get('id')
 
-        if not person.tmdb_person_id:
-            match = tmdb.search_person(
-                person.name,
-                death_date=person.death_date.isoformat() if person.death_date else None,
-            )
-            if not match:
-                return None
-
-            person.tmdb_person_id = match.get('id')
-            db.session.commit()
-
-        if not person.tmdb_person_id:
+        if not tmdb_person_id:
             return None
 
-        return tmdb.person_profile_image_url(person.tmdb_person_id)
+        return tmdb.person_profile_image_url(tmdb_person_id)
 
     except Exception:
         return None
@@ -1239,15 +1408,10 @@ def detail(person_id: int):
     if settings.tmdb_api_key:
         try:
             tmdb_match, tmdb_credits = _load_tmdb_context(person, settings)
-            person_photo_url = _load_tmdb_person_photo(person, settings)
+            person_photo_url = _load_tmdb_person_photo(person, settings, tmdb_match=tmdb_match)
 
             if not person.tmdb_person_id:
-                tmdb = TmdbService(settings.tmdb_api_key)
-                tmdb_candidates = tmdb.search_person_candidates(
-                    person.name,
-                    death_date=person.death_date.isoformat() if person.death_date else None,
-                    limit=5,
-                )
+                tmdb_candidates = _get_tmdb_candidates_for_person(person, settings)
 
             if force_refresh_missing:
                 missing_movies, missing_shows = refresh_person_missing_titles(
@@ -1287,6 +1451,7 @@ def selection_settings(person_id: int):
     person.manual_priority = int(manual_priority_raw) if manual_priority_raw else None
     person.is_pinned = request.form.get('is_pinned') == '1'
     person.exclude_from_auto = request.form.get('exclude_from_auto') == '1'
+    person.force_publish = request.form.get('force_publish') == '1'
     person.selection_note = request.form.get('selection_note', '').strip() or None
 
     if person.exclude_from_auto:

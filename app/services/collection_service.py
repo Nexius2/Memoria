@@ -9,6 +9,31 @@ from .plex_service import PlexService
 from .tmdb_service import TmdbService
 from .plex_library_cache_service import filter_credits_with_library_cache
 
+def _log_app_event(
+    level: str,
+    source: str,
+    message: str,
+    *,
+    details: str | None = None,
+    related_type: str | None = None,
+    related_id: int | None = None,
+) -> None:
+    try:
+        from .scheduler_service import log_app_event
+
+        log_app_event(
+            level,
+            source,
+            message,
+            details=details,
+            related_type=related_type,
+            related_id=related_id,
+        )
+    except Exception:
+        current_app.logger.exception(
+            'Failed to write app log entry from collection_service.'
+        )
+
 
 def render_template_text(template: str, *, person, event, target=None) -> str:
     values = {
@@ -91,14 +116,6 @@ def _find_matches_for_target(plex: PlexService, target, person, tmdb_credits: di
             if title_matches:
                 return title_matches
 
-        title_matches = plex.find_items_by_credit_titles(
-            target.section_name,
-            credits,
-            media_type=media_type,
-        )
-        if title_matches:
-            return title_matches
-
     return plex.find_person_items(target.section_name, person.name)
 
 
@@ -119,16 +136,32 @@ def sync_event(event: TributeEvent) -> None:
         .all()
     )
 
+    plex_by_server_id: dict[int, PlexService] = {}
+
     for target in targets:
         if event.media_mode != 'both' and target.media_type != event.media_mode:
             continue
 
         try:
-            plex = PlexService(
-                target.plex_server.base_url,
-                target.plex_server.token,
-                target.plex_server.verify_ssl,
+            _log_app_event(
+                'info',
+                'sync',
+                (
+                    f'Sync target start for {person.name} '
+                    f'on server "{target.plex_server.name}" / library "{target.section_name}".'
+                ),
+                related_type='event',
+                related_id=event.id,
             )
+
+            plex = plex_by_server_id.get(target.plex_server_id)
+            if plex is None:
+                plex = PlexService(
+                    target.plex_server.base_url,
+                    target.plex_server.token,
+                    target.plex_server.verify_ssl,
+                )
+                plex_by_server_id[target.plex_server_id] = plex
 
             matches = _find_matches_for_target(
                 plex=plex,
@@ -178,6 +211,19 @@ def sync_event(event: TributeEvent) -> None:
                 poster_url=tmdb_person_poster_url,
             )
 
+            _log_app_event(
+                'info',
+                'sync',
+                (
+                    f'Sync target done for {person.name} '
+                    f'on server "{target.plex_server.name}" / library "{target.section_name}" '
+                    f'with {media_count} item(s).'
+                ),
+                details=message,
+                related_type='event',
+                related_id=event.id,
+            )
+
             publication.plex_collection_key = key
             publication.collection_title = title
             publication.media_count = media_count
@@ -213,7 +259,7 @@ def sync_event(event: TributeEvent) -> None:
     db.session.commit()
 
 
-def expire_due_events() -> dict:
+def expire_due_events(task_run_id: int | None = None) -> dict:
     events = (
         TributeEvent.query
         .filter(
@@ -229,6 +275,15 @@ def expire_due_events() -> dict:
 
     for event in events:
         processed_items += 1
+        person_name = event.person.name if event.person else f'person#{event.person_id}'
+
+        _log_app_event(
+            'info',
+            'expire',
+            f'Expiring event for {person_name}.',
+            related_type='event',
+            related_id=event.id,
+        )
 
         removal_result = remove_event_collections(event)
 
@@ -272,23 +327,80 @@ def remove_event_collections(event: TributeEvent) -> dict:
                 target.plex_server.token,
                 target.plex_server.verify_ssl,
             )
+            _log_app_event(
+                'info',
+                'expire',
+                (
+                    f'Removing collection "{publication.collection_title}" '
+                    f'for {event.person.name if event.person else f"person#{event.person_id}"} '
+                    f'on server "{target.plex_server.name}" / library "{target.section_name}".'
+                ),
+                related_type='event',
+                related_id=event.id,
+            )
             message = plex.delete_collection_by_key(
                 target.section_name,
                 publication.plex_collection_key,
                 publication.collection_title,
             )
 
-            if message == 'Collection not found':
+            if message.startswith('Collection deleted |'):
                 publication.status = 'removed'
-                publication.last_message = 'Collection already absent on Plex.'
+                publication.last_message = message
                 publication.last_synced_at = datetime.utcnow()
                 removed_items += 1
+
+                _log_app_event(
+                    'info',
+                    'expire',
+                    (
+                        f'Collection removed for '
+                        f'{event.person.name if event.person else f"person#{event.person_id}"} '
+                        f'on server "{target.plex_server.name}" / library "{target.section_name}".'
+                    ),
+                    details=message,
+                    related_type='event',
+                    related_id=event.id,
+                )
                 continue
 
-            publication.status = 'removed'
+            if message.startswith('Collection not found |'):
+                publication.status = 'error'
+                publication.last_message = message
+                publication.last_synced_at = datetime.utcnow()
+                error_items += 1
+
+                _log_app_event(
+                    'warning',
+                    'expire',
+                    (
+                        f'Collection could not be found for '
+                        f'{event.person.name if event.person else f"person#{event.person_id}"} '
+                        f'on server "{target.plex_server.name}" / library "{target.section_name}".'
+                    ),
+                    details=message,
+                    related_type='event',
+                    related_id=event.id,
+                )
+                continue
+
+            publication.status = 'error'
             publication.last_message = message
             publication.last_synced_at = datetime.utcnow()
-            removed_items += 1
+            error_items += 1
+
+            _log_app_event(
+                'error',
+                'expire',
+                (
+                    f'Collection removal verification failed for '
+                    f'{event.person.name if event.person else f"person#{event.person_id}"} '
+                    f'on server "{target.plex_server.name}" / library "{target.section_name}".'
+                ),
+                details=message,
+                related_type='event',
+                related_id=event.id,
+            )
 
         except Exception as exc:
             publication.status = 'error'

@@ -35,6 +35,8 @@ _CLEANUP_TASK_LOCK = Lock()
 
 _STARTUP_DETECTION_COOLDOWN_MINUTES = 30
 _STARTUP_TASK_COOLDOWN_MINUTES = 30
+_FORCE_PUBLISH_BONUS = 2_000_000
+_PIN_BONUS = 1_000_000
 
 def log_app_event(
     level: str,
@@ -89,14 +91,14 @@ def register_jobs(app):
         replace_existing=True,
     )
     scheduler.add_job(
-        func=lambda: _run_in_app(app, sync_active_events),
+        func=lambda: _run_in_app(app, enqueue_task_run, app, 'sync', 'auto'),
         trigger='interval',
         hours=12,
         id='sync_active_events',
         replace_existing=True,
     )
     scheduler.add_job(
-        func=lambda: _run_in_app(app, expire_events),
+        func=lambda: _run_in_app(app, enqueue_task_run, app, 'expire', 'auto'),
         trigger='interval',
         hours=6,
         id='expire_events',
@@ -169,22 +171,7 @@ def run_startup_catchup(app) -> None:
             details=str(exc),
         )
 
-    try:
-        if _should_run_task_startup_catchup('sync'):
-            enqueue_task_run(app, 'sync', 'startup')
-        else:
-            _log_startup_catchup_skip(
-                'sync',
-                f'A successful sync run finished less than {_STARTUP_TASK_COOLDOWN_MINUTES} minutes ago.',
-            )
-    except Exception as exc:
-        current_app.logger.exception('Startup catch-up failed while queueing sync task.')
-        log_app_event(
-            'error',
-            'scheduler',
-            'Startup catch-up failed while queueing sync task.',
-            details=str(exc),
-        )
+
 
     try:
         if _should_run_task_startup_catchup('expire'):
@@ -200,6 +187,23 @@ def run_startup_catchup(app) -> None:
             'error',
             'scheduler',
             'Startup catch-up failed while queueing expire task.',
+            details=str(exc),
+        )
+
+    try:
+        if _should_run_task_startup_catchup('sync'):
+            enqueue_task_run(app, 'sync', 'startup')
+        else:
+            _log_startup_catchup_skip(
+                'sync',
+                f'A successful sync run finished less than {_STARTUP_TASK_COOLDOWN_MINUTES} minutes ago.',
+            )
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed while queueing sync task.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed while queueing sync task.',
             details=str(exc),
         )
 
@@ -914,20 +918,32 @@ def _upsert_person_from_row(row: dict) -> tuple[Person, bool]:
 
     return person, changed
 
+def _base_selection_priority(row: dict, person: Person | None) -> int:
+    if person and person.manual_priority is not None:
+        return int(person.manual_priority)
+
+    return int(row.get('popularity_score') or 0)
+
+
 def _compute_selection_priority(row: dict, person: Person | None) -> int:
-    score = int(row.get('popularity_score') or 0)
+    score = _base_selection_priority(row, person)
 
     if person:
-        if person.manual_priority is not None:
-            score = int(person.manual_priority)
-
         if person.is_pinned:
-            score += 1_000_000
+            score += _PIN_BONUS
+
+        if person.force_publish:
+            score += _FORCE_PUBLISH_BONUS
 
     return score
 
 
-def _select_rows_for_auto_events(rows: list[dict], people_by_slug: dict[str, Person], max_people: int) -> list[dict]:
+def _select_rows_for_auto_events(
+    rows: list[dict],
+    people_by_slug: dict[str, Person],
+    max_people: int,
+    min_priority: int,
+) -> list[dict]:
     eligible_rows = []
 
     for row in rows:
@@ -938,6 +954,12 @@ def _select_rows_for_auto_events(rows: list[dict], people_by_slug: dict[str, Per
                 continue
             if person.ignore_until and person.ignore_until >= date.today():
                 continue
+
+        base_priority = _base_selection_priority(row, person)
+        is_forced = bool(person and person.force_publish)
+
+        if not is_forced and base_priority < int(min_priority or 0):
+            continue
 
         row_copy = dict(row)
         row_copy['_selection_priority'] = _compute_selection_priority(row, person)
@@ -953,6 +975,37 @@ def _select_rows_for_auto_events(rows: list[dict], people_by_slug: dict[str, Per
     )
 
     return eligible_rows[:max_people]
+
+def _append_forced_people_rows(rows: list[dict], people_by_slug: dict[str, Person]) -> list[dict]:
+    existing_slugs = {row.get('slug') for row in rows}
+    merged_rows = list(rows)
+
+    forced_people = (
+        Person.query
+        .filter(Person.force_publish.is_(True))
+        .all()
+    )
+
+    for person in forced_people:
+        people_by_slug[person.slug] = person
+
+        if person.slug in existing_slugs:
+            continue
+
+        merged_rows.append({
+            'name': person.name,
+            'slug': person.slug,
+            'death_date': person.death_date.isoformat() if person.death_date else '',
+            'country': person.country,
+            'wikidata_id': person.wikidata_id,
+            'imdb_id': person.imdb_id,
+            'source_url': person.source_url,
+            'popularity_score': int(person.web_priority or 0),
+            'professions_csv': person.professions_csv,
+        })
+        existing_slugs.add(person.slug)
+
+    return merged_rows
 
 def _collect_replacement_candidates(selected_slugs: set[str], needed_slots: int) -> list[TributeEvent]:
     if needed_slots <= 0:
@@ -1002,7 +1055,7 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
         return {'cached': 0, 'created_events': 0, 'updated_people': 0}
 
     detector = DetectionService(settings)
-    rows = detector.refresh_candidate_cache(limit=max(settings.max_people * 4, 12))
+    rows = detector.refresh_candidate_cache(limit=None)
 
     updated_people = 0
     created_events = 0
@@ -1014,10 +1067,13 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
         if changed:
             updated_people += 1
 
+    rows = _append_forced_people_rows(rows, people_by_slug)
+
     selected_rows = _select_rows_for_auto_events(
         rows=rows,
         people_by_slug=people_by_slug,
         max_people=settings.max_people,
+        min_priority=settings.min_people_priority_display,
     )
     selected_slugs = {row['slug'] for row in selected_rows}
 
@@ -1150,6 +1206,26 @@ def sync_active_events(task_run_id: int | None = None):
     for event in events:
         try:
             if event.end_date >= date.today():
+                person_name = event.person.name if event.person else f'person#{event.person_id}'
+
+                if task_run_id:
+                    _update_task_run_progress(
+                        task_run_id,
+                        total_items=total_items,
+                        processed_items=processed_items,
+                        success_items=success_items,
+                        error_items=error_items,
+                        message=f'Sync running... {processed_items + 1}/{total_items} · {person_name}',
+                    )
+
+                log_app_event(
+                    'info',
+                    'sync',
+                    f'Syncing event for {person_name}.',
+                    related_type='event',
+                    related_id=event.id,
+                )
+
                 sync_event(event)
                 success_items += 1
         except Exception as exc:
@@ -1225,7 +1301,7 @@ def expire_events(task_run_id: int | None = None):
         related_id=task_run_id,
     )
 
-    expire_result = expire_due_events()
+    expire_result = expire_due_events(task_run_id=task_run_id)
 
     processed_items = int(expire_result.get('processed_items') or 0)
     success_items = int(expire_result.get('success_items') or 0)

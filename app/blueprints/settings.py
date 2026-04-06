@@ -66,6 +66,11 @@ def save():
             'max_people',
             'Max simultaneous people',
         )
+        settings.min_people_priority_display = _parse_positive_int(
+            'min_people_priority_display',
+            'Minimum people priority level',
+            minimum=0,
+        )
         settings.log_retention_days = _parse_positive_int(
             'log_retention_days',
             'Log retention days',

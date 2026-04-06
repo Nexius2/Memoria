@@ -45,10 +45,78 @@ def _load_arr_activities(limit: int = 50):
         .all()
     )
 
+def _attach_arr_profile_metadata(arr_servers: list[ArrServer]) -> None:
+    for arr in arr_servers:
+        arr.quality_profile_name = None
+        arr.language_profile_name = None
+        arr.available_quality_profiles = []
+        arr.available_language_profiles = []
+        arr.quality_profile_missing = False
+        arr.language_profile_missing = False
+
+        if not arr.enabled:
+            continue
+
+        try:
+            service = ArrService(arr)
+
+            quality_profiles = service.quality_profiles() or []
+            language_profiles = service.language_profiles() or []
+
+            quality_map = {
+                item.get('id'): item.get('name')
+                for item in quality_profiles
+                if item.get('id') is not None
+            }
+            language_map = {
+                item.get('id'): item.get('name')
+                for item in language_profiles
+                if item.get('id') is not None
+            }
+
+            arr.quality_profile_name = quality_map.get(arr.quality_profile_id)
+            arr.language_profile_name = language_map.get(arr.language_profile_id)
+
+            arr.quality_profile_missing = (
+                arr.quality_profile_id is not None
+                and arr.quality_profile_name is None
+            )
+            arr.language_profile_missing = (
+                arr.kind == 'sonarr'
+                and arr.language_profile_id is not None
+                and arr.language_profile_name is None
+            )
+
+            arr.available_quality_profiles = list(quality_profiles)
+            if arr.quality_profile_missing:
+                arr.available_quality_profiles.insert(0, {
+                    'id': arr.quality_profile_id,
+                    'name': f'⚠ Missing profile (ID {arr.quality_profile_id})',
+                })
+
+            if arr.kind == 'sonarr':
+                arr.available_language_profiles = list(language_profiles)
+                if arr.language_profile_missing:
+                    arr.available_language_profiles.insert(0, {
+                        'id': arr.language_profile_id,
+                        'name': f'⚠ Missing profile (ID {arr.language_profile_id})',
+                    })
+            else:
+                arr.available_language_profiles = []
+
+        except Exception:
+            # On ne casse pas la page si Arr ne répond pas
+            arr.available_quality_profiles = []
+            arr.available_language_profiles = []
+            arr.quality_profile_name = None
+            arr.language_profile_name = None
+            arr.quality_profile_missing = False
+            arr.language_profile_missing = False
 
 @bp.route('/')
 def index():
     arr_servers = ArrServer.query.order_by(ArrServer.name.asc()).all()
+    _attach_arr_profile_metadata(arr_servers)
 
     status_filter = (request.args.get('status') or 'all').strip()
     server_filter = (request.args.get('server') or 'all').strip()
@@ -104,6 +172,7 @@ def index():
 @bp.post('/test-fill')
 def test_fill():
     arr_servers = ArrServer.query.order_by(ArrServer.name.asc()).all()
+    _attach_arr_profile_metadata(arr_servers)
 
     form_data = {
         'name': request.form.get('name', '').strip(),
@@ -162,6 +231,7 @@ def test_fill():
 @bp.post('/create')
 def create_arr():
     arr_servers = ArrServer.query.order_by(ArrServer.name.asc()).all()
+    _attach_arr_profile_metadata(arr_servers)
 
     form_data = {
         'name': request.form.get('name', '').strip(),
@@ -289,6 +359,133 @@ def create_arr():
     flash('Arr server added.', 'success')
     return redirect(url_for('arr.index'))
 
+@bp.post('/<int:arr_id>/update')
+def update_arr(arr_id: int):
+    arr = ArrServer.query.get_or_404(arr_id)
+
+    new_name = (request.form.get('name') or '').strip()
+    new_kind = (request.form.get('kind') or 'radarr').strip()
+    new_base_url = (request.form.get('base_url') or '').strip()
+    new_api_key = (request.form.get('api_key') or '').strip()
+    new_root_folder = (request.form.get('root_folder') or '').strip()
+    new_quality_profile_id = _parse_int_field('quality_profile_id')
+    new_language_profile_id = _parse_int_field('language_profile_id') if new_kind == 'sonarr' else None
+    new_search_on_add = request.form.get('search_on_add') == 'on'
+    new_enabled = request.form.get('enabled') == 'on'
+
+    temp_arr = ArrServer(
+        id=arr.id,
+        name=new_name or arr.name,
+        kind=new_kind,
+        base_url=new_base_url,
+        api_key=new_api_key,
+        root_folder=new_root_folder,
+        quality_profile_id=new_quality_profile_id,
+        language_profile_id=new_language_profile_id,
+        search_on_add=new_search_on_add,
+        enabled=new_enabled,
+    )
+
+    discovery = ArrService(temp_arr).test_and_discover()
+
+    if not discovery.get('ok'):
+        arr_servers = ArrServer.query.order_by(ArrServer.name.asc()).all()
+        _attach_arr_profile_metadata(arr_servers)
+        arr_activities = _load_arr_activities(50)
+
+        return render_template(
+            'arr.html',
+            arr_servers=arr_servers,
+            arr_form_data=None,
+            arr_discovery=None,
+            arr_activities=arr_activities,
+            status_filter='all',
+            server_filter='all',
+            media_kind_filter='all',
+            limit=50,
+            arr_open_edit_id=arr.id,
+            arr_modal_error_title='Unable to validate Arr server',
+            arr_modal_error_message=(
+                f'Memoria could not reload the configuration from {temp_arr.kind.title()}. '
+                f'Reason: {discovery.get("message")}'
+            ),
+        )
+
+    root_folders = discovery.get('root_folders') or []
+    quality_profiles = discovery.get('quality_profiles') or []
+    language_profiles = discovery.get('language_profiles') or []
+
+    valid_root_paths = {
+        (item.get('path') or '').strip()
+        for item in root_folders
+        if (item.get('path') or '').strip()
+    }
+
+    valid_quality_ids = {
+        item.get('id')
+        for item in quality_profiles
+        if item.get('id') is not None
+    }
+
+    valid_language_ids = {
+        item.get('id')
+        for item in language_profiles
+        if item.get('id') is not None
+    }
+
+    error_message = None
+
+    if not new_root_folder or new_root_folder not in valid_root_paths:
+        error_message = (
+            'The selected root folder no longer exists in Arr. '
+            'The page has been reloaded with the latest values from Arr.'
+        )
+    elif new_quality_profile_id is None or new_quality_profile_id not in valid_quality_ids:
+        error_message = (
+            'The selected quality profile no longer exists in Arr. '
+            'The page has been reloaded with the latest profiles from Arr. '
+            'Please choose a valid profile and save again.'
+        )
+    elif new_kind == 'sonarr' and new_language_profile_id is not None and new_language_profile_id not in valid_language_ids:
+        error_message = (
+            'The selected language profile no longer exists in Arr. '
+            'The page has been reloaded with the latest profiles from Arr. '
+            'Please choose a valid profile and save again.'
+        )
+
+    if error_message:
+        arr_servers = ArrServer.query.order_by(ArrServer.name.asc()).all()
+        _attach_arr_profile_metadata(arr_servers)
+        arr_activities = _load_arr_activities(50)
+
+        return render_template(
+            'arr.html',
+            arr_servers=arr_servers,
+            arr_form_data=None,
+            arr_discovery=None,
+            arr_activities=arr_activities,
+            status_filter='all',
+            server_filter='all',
+            media_kind_filter='all',
+            limit=50,
+            arr_open_edit_id=arr.id,
+            arr_modal_error_title='Arr profile changed',
+            arr_modal_error_message=error_message,
+        )
+
+    arr.name = new_name
+    arr.kind = new_kind
+    arr.base_url = new_base_url
+    arr.api_key = new_api_key
+    arr.root_folder = new_root_folder
+    arr.quality_profile_id = new_quality_profile_id
+    arr.language_profile_id = new_language_profile_id if new_kind == 'sonarr' else None
+    arr.search_on_add = new_search_on_add
+    arr.enabled = new_enabled
+
+    db.session.commit()
+    flash('Arr server updated.', 'success')
+    return redirect(url_for('arr.index'))
 
 @bp.post('/<int:arr_id>/delete')
 def delete_arr(arr_id: int):

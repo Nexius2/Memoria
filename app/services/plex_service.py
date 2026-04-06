@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
+import threading
 import unicodedata
 import time
 
@@ -12,6 +13,7 @@ from plexapi.server import PlexServer as PlexApiServer
 PLEX_REQUEST_TIMEOUT = 20
 PLEX_TITLE_SEARCH_LIMIT = 12
 PLEX_PERSON_SEARCH_LIMIT = 100
+PLEX_MIN_REQUEST_INTERVAL = 0.2
 
 
 @dataclass
@@ -21,15 +23,38 @@ class PlexMatch:
     year: int | None
     match_source: str = "unknown"
 
+_PLEX_RATE_LOCK = threading.Lock()
+_PLEX_LAST_REQUEST_AT_BY_BASE: dict[str, float] = {}
+
+
+def _normalize_plex_base_url(url: str | None) -> str:
+    return (url or "").strip().rstrip("/")
+
+
+def _apply_plex_rate_limit(base_url: str) -> None:
+    if not base_url:
+        return
+
+    with _PLEX_RATE_LOCK:
+        last_request_at = _PLEX_LAST_REQUEST_AT_BY_BASE.get(base_url, 0.0)
+        now = time.monotonic()
+        elapsed = now - last_request_at
+
+        if elapsed < PLEX_MIN_REQUEST_INTERVAL:
+            time.sleep(PLEX_MIN_REQUEST_INTERVAL - elapsed)
+
+        _PLEX_LAST_REQUEST_AT_BY_BASE[base_url] = time.monotonic()
 
 class TimeoutSession(requests.Session):
-    def __init__(self, timeout: int, verify_ssl: bool = True):
+    def __init__(self, timeout: int, base_url: str, verify_ssl: bool = True):
         super().__init__()
         self._default_timeout = timeout
+        self._plex_base_url = _normalize_plex_base_url(base_url)
         self.verify = verify_ssl
 
     def request(self, method, url, **kwargs):
         kwargs.setdefault("timeout", self._default_timeout)
+        _apply_plex_rate_limit(self._plex_base_url)
         return super().request(method, url, **kwargs)
 
 
@@ -66,6 +91,7 @@ class PlexService:
 
         self.session = TimeoutSession(
             timeout=self.request_timeout,
+            base_url=self.base_url,
             verify_ssl=verify_ssl,
         )
 
@@ -79,6 +105,7 @@ class PlexService:
             session=self.session,
             timeout=self.request_timeout,
         )
+        self._section_cache: dict[str, object] = {}
 
     def list_library_sections(self) -> list[dict]:
         sections = []
@@ -86,6 +113,13 @@ class PlexService:
             if section.type in {"movie", "show"}:
                 sections.append({"title": section.title, "type": section.type})
         return sections
+
+    def _get_section(self, section_name: str):
+        section = self._section_cache.get(section_name)
+        if section is None:
+            section = self.server.library.section(section_name)
+            self._section_cache[section_name] = section
+        return section
 
     def _item_titles(self, item) -> set[str]:
         titles = set()
@@ -105,7 +139,7 @@ class PlexService:
         return "movie" if getattr(section, "type", None) == "movie" else "show"
 
     def list_title_keys(self, section_name: str) -> tuple[set[tuple[str, int | None]], set[str]]:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
         keys_with_year: set[tuple[str, int | None]] = set()
         keys_without_year: set[str] = set()
 
@@ -124,7 +158,7 @@ class PlexService:
         aliases: list[str] | None = None,
         limit: int | None = None,
     ) -> list[PlexMatch]:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
         libtype = self._section_libtype(section)
 
         candidate_names: list[str] = []
@@ -178,7 +212,7 @@ class PlexService:
         media_type: str | None = None,
         limit: int | None = None,
     ) -> list[PlexMatch]:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
         libtype = self._section_libtype(section)
 
         years_by_title: dict[str, set[int | None]] = {}
@@ -262,7 +296,7 @@ class PlexService:
         media_type: str | None = None,
         limit: int | None = None,
     ) -> list[PlexMatch]:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
 
         expected_titles: dict[str, set[int | None]] = {}
 
@@ -347,7 +381,7 @@ class PlexService:
         publish_on_friends_home: bool = False,
         poster_url: str | None = None,
     ) -> tuple[str | None, int, str]:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
         items = list(items)
 
         if not items:
@@ -502,23 +536,72 @@ class PlexService:
         collection_key: str | None,
         fallback_title: str | None = None,
     ) -> str:
-        section = self.server.library.section(section_name)
+        section = self._get_section(section_name)
+        collections = list(section.collections())
         target = None
 
+        normalized_fallback_title = _normalize_text(fallback_title)
+
         if collection_key:
-            for collection in section.collections():
-                if str(collection.ratingKey) == str(collection_key):
+            for collection in collections:
+                if str(getattr(collection, "ratingKey", "")) == str(collection_key):
                     target = collection
                     break
 
         if not target and fallback_title:
-            for collection in section.collections():
-                if collection.title == fallback_title:
+            for collection in collections:
+                if (collection.title or "").strip() == fallback_title.strip():
+                    target = collection
+                    break
+
+        if not target and normalized_fallback_title:
+            for collection in collections:
+                if _normalize_text(collection.title) == normalized_fallback_title:
                     target = collection
                     break
 
         if not target:
-            return "Collection not found"
+            available_titles = ", ".join(
+                sorted(
+                    {
+                        (collection.title or "").strip()
+                        for collection in collections
+                        if (collection.title or "").strip()
+                    }
+                )
+            )
+            return (
+                "Collection not found | "
+                f"section={section_name} | "
+                f"key={collection_key or ''} | "
+                f"title={fallback_title or ''} | "
+                f"available={available_titles}"
+            )
+
+        target_title = target.title or fallback_title or ""
+        target_key = str(getattr(target, "ratingKey", "") or "")
 
         target.delete()
-        return "Collection deleted"
+
+        remaining = list(section.collections())
+
+        for collection in remaining:
+            if target_key and str(getattr(collection, "ratingKey", "")) == target_key:
+                return (
+                    "Collection delete verification failed | "
+                    f"section={section_name} | key={target_key} | title={target_title}"
+                )
+
+        normalized_target_title = _normalize_text(target_title)
+        if normalized_target_title:
+            for collection in remaining:
+                if _normalize_text(collection.title) == normalized_target_title:
+                    return (
+                        "Collection delete verification failed | "
+                        f"section={section_name} | key={target_key} | title={target_title}"
+                    )
+
+        return (
+            "Collection deleted | "
+            f"section={section_name} | key={target_key} | title={target_title}"
+        )

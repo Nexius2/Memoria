@@ -61,10 +61,30 @@
       </select>
     </div>
 
-    <div class="flex items-end gap-3">
-      <button type="submit" class="btn-primary flex-1">Apply</button>
-      <a href="{{ url_for('main.logs') }}" class="btn-secondary">Reset</a>
-    </div>
+		<div class="flex items-center justify-end gap-2 flex-wrap">
+
+		  <a
+			href="{{ url_for('main.export_logs', level=level, source=source, date_from=date_from, date_to=date_to) }}"
+			class="btn-secondary whitespace-nowrap"
+		  >
+			Export CSV
+		  </a>
+
+		  <a
+			href="{{ url_for('main.logs') }}"
+			class="btn-secondary opacity-70 hover:opacity-100 whitespace-nowrap"
+		  >
+			Reset
+		  </a>
+
+		  <button
+			type="submit"
+			class="btn-primary whitespace-nowrap"
+		  >
+			Apply
+		  </button>
+
+		</div>
   </form>
 
   <div class="space-y-3">

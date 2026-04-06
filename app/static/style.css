@@ -128,3 +128,8 @@ body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
   padding: .55rem .9rem;
   font-size: .92rem;
 }
+/* Mask secret inputs (API keys, tokens) */
+input[data-secret-masked="1"] {
+  -webkit-text-security: disc;
+  text-security: disc;
+}

@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% from '_secret_fields.html' import secret_input_attrs %}
+
+{% block content %}
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+  <div class="panel">
+    <h2 class="text-xl font-semibold text-white mb-4">Add Plex server</h2>
+
+    <form
+      method="post"
+      action="{{ url_for('servers.create_server') }}"
+      class="space-y-4 relative"
+      autocomplete="off"
+      data-form-type="other"
+    >
+
+      <div>
+        <label class="field-label">Name *</label>
+        <input class="field" type="text" name="name" required>
+      </div>
+
+      <div>
+        <label class="field-label">Base URL *</label>
+        <input class="field" type="text" name="base_url" placeholder="http://plex:32400" required>
+      </div>
+
+      <div>
+        <label class="field-label">Token *</label>
+        <div class="flex gap-2">
+          <input
+            id="plex-add-token-input"
+            class="field"
+            name="token"
+            {{ secret_input_attrs() }}
+            required
+          >
+          <button
+            type="button"
+            class="btn-secondary whitespace-nowrap"
+            data-secret-toggle="plex-add-token-input"
+          >
+            Show
+          </button>
+        </div>
+      </div>
+
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="verify_ssl"> Verify SSL
+      </label>
+
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="enabled" checked> Enabled
+      </label>
+
+      <button class="btn-primary w-full" type="submit">Add server</button>
+    </form>
+  </div>
+
+  <div class="xl:col-span-2 space-y-6">
+    <div class="panel text-sm text-emerald-200/70">
+      Enabled libraries keep a cached Plex title index used by the automatic missing titles scan.
+      The cache is refreshed by the scheduler, so people scans do not need to re-read the whole Plex library every time.
+    </div>
+
+    {% if servers %}
+      {% for server in servers %}
+        <div class="panel">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div>
+              <h3 class="text-xl font-semibold text-white">{{ server.name }}</h3>
+              <div class="text-sm text-emerald-200/60">{{ server.base_url }}</div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <form method="post" action="{{ url_for('servers.discover_libraries', server_id=server.id) }}">
+                <button class="btn-secondary" type="submit">Discover libraries</button>
+              </form>
+
+              <form method="post" action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}">
+                <button class="btn-secondary" type="submit">Refresh Plex cache</button>
+              </form>
+
+              <a class="btn-secondary" href="{{ url_for('servers.edit_server', server_id=server.id) }}">Edit</a>
+
+              <form
+                method="post"
+                action="{{ url_for('servers.delete_server', server_id=server.id) }}"
+                class="js-confirm-delete-form"
+                data-confirm-title="Delete Plex server"
+                data-confirm-message="Are you sure you want to delete the Plex server '{{ server.name }}'? Its discovered library mappings will also be removed."
+                data-confirm-button="Delete Plex server"
+              >
+                <button class="btn-danger" type="submit">Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="panel text-sm text-emerald-200/60">No Plex server configured yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
