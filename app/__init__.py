@@ -8,6 +8,25 @@ from sqlalchemy import inspect, text
 from .extensions import db, scheduler
 from .models import AppSettings
 
+def _read_info_version() -> str | None:
+    info_path = Path(__file__).resolve().parent.parent / 'INFO'
+
+    if not info_path.exists():
+        return None
+
+    try:
+        for raw_line in info_path.read_text(encoding='utf-8').splitlines():
+            line = raw_line.strip()
+            if not line or '=' not in line:
+                continue
+
+            key, value = line.split('=', 1)
+            if key.strip() == 'VERSION':
+                return value.strip() or None
+    except Exception:
+        return None
+
+    return None
 
 def _ensure_runtime_schema():
     inspector = inspect(db.engine)
@@ -187,6 +206,7 @@ def create_app():
             'settings': AppSettings.get_or_create(),
             'arr_servers': ArrServer.query.order_by(ArrServer.name.asc()).all(),
             'library_targets': LibraryTarget.query.order_by(LibraryTarget.section_name.asc()).all(),
+            'app_version': _read_info_version(),
         }
 
     with app.app_context():

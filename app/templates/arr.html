@@ -483,12 +483,18 @@
       </p>
     </div>
 
-    <div class="text-xs text-emerald-200/60">
-      {{ arr_activities|length }} row{{ 's' if arr_activities|length != 1 else '' }} shown
+    <div class="flex items-center gap-3">
+      <a href="{{ url_for('arr.missing_titles') }}" class="btn-secondary">
+        Missing titles
+      </a>
+
+      <div class="text-xs text-emerald-200/60">
+        {{ arr_activities|length }} shown{% if total_arr_activities is defined %} / {{ total_arr_activities }} matching{% endif %}
+      </div>
     </div>
   </div>
 
-  <form method="get" action="{{ url_for('arr.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
+  <form method="get" action="{{ url_for('arr.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
     <div>
       <label class="field-label">Status</label>
       <select class="field" name="status">
@@ -521,15 +527,7 @@
       </select>
     </div>
 
-    <div>
-      <label class="field-label">Limit</label>
-      <select class="field" name="limit">
-        <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
-        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
-        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
-        <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
-      </select>
-    </div>
+
 
     <div class="flex items-end gap-3">
       <button type="submit" class="btn-primary flex-1">Apply</button>
@@ -595,6 +593,30 @@
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-5 pt-4 border-t border-emerald-400/10">
+    <div class="text-xs text-emerald-200/60">
+      Page {{ page or 1 }} · {{ recent_arr_activity_limit }} row{{ 's' if recent_arr_activity_limit != 1 else '' }} per page
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a
+        href="{{ url_for('arr.index', status=status_filter, server=server_filter, media_kind=media_kind_filter, page=(page - 1)) }}"
+        class="btn-secondary {% if not has_previous_page %}pointer-events-none opacity-50{% endif %}"
+        aria-disabled="{{ 'true' if not has_previous_page else 'false' }}"
+      >
+        Previous
+      </a>
+
+      <a
+        href="{{ url_for('arr.index', status=status_filter, server=server_filter, media_kind=media_kind_filter, page=(page + 1)) }}"
+        class="btn-secondary {% if not has_next_page %}pointer-events-none opacity-50{% endif %}"
+        aria-disabled="{{ 'true' if not has_next_page else 'false' }}"
+      >
+        Next
+      </a>
+    </div>
   </div>
 </div>
 <div

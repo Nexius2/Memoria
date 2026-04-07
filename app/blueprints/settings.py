@@ -36,10 +36,6 @@ def save():
     is_autosave = request.form.get('_autosave') == '1'
 
     try:
-        app_name = (request.form.get('app_name') or '').strip()
-        if not app_name:
-            raise ValueError('App name is required.')
-
         collection_name_template = (request.form.get('collection_name_template') or '').strip()
         if not collection_name_template:
             raise ValueError('Collection name template is required.')
@@ -52,7 +48,7 @@ def save():
         if default_media_mode not in {'both', 'movie', 'show'}:
             raise ValueError('Default media mode is invalid.')
 
-        settings.app_name = app_name
+
         settings.auto_detection_enabled = request.form.get('auto_detection_enabled') == 'on'
         settings.detection_window_days = _parse_positive_int(
             'detection_window_days',

@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+
+{% block title %}Missing Titles{% endblock %}
+{% block header_title %}Missing Titles{% endblock %}
+{% block header_subtitle %}Global Arr view of missing movies and shows{% endblock %}
+
+{% block content %}
+
+<div class="panel mb-6">
+  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+    <div>
+      <h2 class="text-xl font-semibold text-white section-title-with-icon">
+        <span class="section-title-icon">⌕</span>
+        <span>Global Missing Titles</span>
+      </h2>
+      <p class="text-sm text-emerald-200/70 mt-1">
+        All missing movies and shows detected across people, with Arr readiness visibility.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="{{ url_for('arr.index') }}" class="btn-secondary">
+        <span class="btn-icon">←</span>
+        <span>Back to Arr</span>
+      </a>
+
+      <div class="text-xs text-emerald-200/60">
+        {{ rows|length }} shown / {{ total_missing_titles }} matching
+      </div>
+    </div>
+  </div>
+
+  <form method="get" action="{{ url_for('arr.missing_titles') }}" class="filter-toolbar">
+    <div class="filter-toolbar-header">
+      <div>
+        <div class="filter-toolbar-title">Filters</div>
+        <div class="filter-toolbar-subtitle">Refine missing titles before using bulk Arr actions below.</div>
+      </div>
+      <div class="filter-toolbar-meta">
+        {{ rows|length }} shown / {{ total_missing_titles }} matching
+      </div>
+    </div>
+
+    <div class="filter-toolbar-grid cols-6">
+      <div>
+        <label class="field-label">Search</label>
+        <input
+          type="text"
+          name="search"
+          value="{{ search }}"
+          class="field"
+          placeholder="Title, person, country, source"
+        >
+      </div>
+
+      <div>
+        <label class="field-label">Type</label>
+        <select class="field" name="media_kind">
+          <option value="all" {% if media_kind_filter == 'all' %}selected{% endif %}>All types</option>
+          <option value="movie" {% if media_kind_filter == 'movie' %}selected{% endif %}>Movie</option>
+          <option value="show" {% if media_kind_filter == 'show' %}selected{% endif %}>Show</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Arr readiness</label>
+        <select class="field" name="arr_ready">
+          <option value="all" {% if arr_ready_filter == 'all' %}selected{% endif %}>All</option>
+          <option value="ready" {% if arr_ready_filter == 'ready' %}selected{% endif %}>Ready</option>
+          <option value="not_ready" {% if arr_ready_filter == 'not_ready' %}selected{% endif %}>Not ready</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Source</label>
+        <select class="field" name="source">
+          <option value="all" {% if source_filter == 'all' %}selected{% endif %}>All sources</option>
+          {% for value in available_sources %}
+            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="field-label">Country</label>
+        <select class="field" name="country">
+          <option value="all" {% if country_filter == 'all' %}selected{% endif %}>All countries</option>
+          {% for value in available_countries %}
+            <option value="{{ value }}" {% if country_filter == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-toolbar-actions">
+        <button type="submit" class="btn-primary">Apply</button>
+        <a href="{{ url_for('arr.missing_titles') }}" class="btn-secondary">Reset</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-5">
+    <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+      <div class="text-sm font-semibold text-white mb-2">Movie targets</div>
+      <div class="space-y-2 text-sm text-emerald-100/80">
+        {% for target in movie_targets %}
+          <div>
+            {{ target.plex_server.name }} → {{ target.section_name }}
+            <span class="text-emerald-200/60">({{ target.arr_server.name if target.arr_server else 'No Arr server' }})</span>
+          </div>
+        {% else %}
+          <div class="text-amber-100/80">No movie Arr target configured.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+      <div class="text-sm font-semibold text-white mb-2">Show targets</div>
+      <div class="space-y-2 text-sm text-emerald-100/80">
+        {% for target in show_targets %}
+          <div>
+            {{ target.plex_server.name }} → {{ target.section_name }}
+            <span class="text-emerald-200/60">({{ target.arr_server.name if target.arr_server else 'No Arr server' }})</span>
+          </div>
+        {% else %}
+          <div class="text-amber-100/80">No show Arr target configured.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 mb-5">
+    <div class="flex flex-col xl:flex-row xl:items-end gap-3">
+      <div class="flex-1">
+        <div class="text-sm font-semibold text-white mb-1">Bulk send selected</div>
+        <div class="text-xs text-emerald-200/60">
+          Select visible rows, choose one Arr target, then send all compatible selected titles to that target.
+        </div>
+      </div>
+
+      <form
+        id="bulk-missing-titles-form"
+        method="post"
+        action="{{ url_for('arr.bulk_send_missing_titles') }}"
+        class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_auto] gap-3 w-full xl:w-auto"
+      >
+        <input type="hidden" name="return_page" value="{{ page }}">
+        <input type="hidden" name="return_search" value="{{ search }}">
+        <input type="hidden" name="return_media_kind" value="{{ media_kind_filter }}">
+        <input type="hidden" name="return_arr_ready" value="{{ arr_ready_filter }}">
+        <input type="hidden" name="return_source" value="{{ source_filter }}">
+        <input type="hidden" name="return_country" value="{{ country_filter }}">
+
+        <div>
+          <label class="field-label">Target</label>
+          <select class="field" name="target_id" required>
+            <option value="">Select a target</option>
+
+            {% if movie_targets %}
+              <optgroup label="Movie targets">
+                {% for target in movie_targets %}
+                  <option value="{{ target.id }}">
+                    [movie] {{ target.plex_server.name }} → {{ target.section_name }} ({{ target.arr_server.name if target.arr_server else 'No Arr server' }})
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% endif %}
+
+            {% if show_targets %}
+              <optgroup label="Show targets">
+                {% for target in show_targets %}
+                  <option value="{{ target.id }}">
+                    [show] {{ target.plex_server.name }} → {{ target.section_name }} ({{ target.arr_server.name if target.arr_server else 'No Arr server' }})
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% endif %}
+          </select>
+        </div>
+
+        <div class="flex items-end">
+          <button type="submit" class="btn-primary w-full">
+            Send selected
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
+          <th class="py-2 pr-4 w-12">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-emerald-400/20 bg-transparent"
+              onclick="document.querySelectorAll('.missing-title-checkbox:not([disabled])').forEach(cb => cb.checked = this.checked)"
+              aria-label="Select all visible rows"
+            >
+          </th>
+          <th class="py-2 pr-4">Person</th>
+          <th class="py-2 pr-4">Type</th>
+          <th class="py-2 pr-4">Title</th>
+          <th class="py-2 pr-4">Year</th>
+          <th class="py-2 pr-4">Date</th>
+          <th class="py-2 pr-4">Country</th>
+          <th class="py-2 pr-4">Source</th>
+          <th class="py-2 pr-4">Arr ready</th>
+          <th class="py-2 pr-4">Last Arr</th>
+          <th class="py-2">Targets</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="border-b border-emerald-400/5 align-top">
+            <td class="py-3 pr-4">
+              <input
+                type="checkbox"
+                name="selected_items"
+                value="{{ {'person_id': row.person_id, 'media_kind': row.media_kind, 'external_id': row.external_id, 'title': row.title, 'year': row.year}|tojson|forceescape }}"
+                form="bulk-missing-titles-form"
+                class="missing-title-checkbox h-4 w-4 rounded border-emerald-400/20 bg-transparent"
+                {% if not row.arr_ready or row.last_arr_status in ['created', 'already_exists'] %}disabled{% endif %}
+                aria-label="Select {{ row.title }}"
+              >
+            </td>
+
+            <td class="py-3 pr-4">
+              <a class="text-white hover:text-emerald-200" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+                {{ row.person_name }}
+              </a>
+            </td>
+
+            <td class="py-3 pr-4 text-white">{{ row.media_kind }}</td>
+            <td class="py-3 pr-4 text-white">{{ row.title }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ row.year or '—' }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ row.item_date or '—' }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ row.country or '—' }}</td>
+            <td class="py-3 pr-4 text-emerald-100/80">{{ row.source or '—' }}</td>
+
+            <td class="py-3 pr-4">
+              {% if row.arr_ready %}
+                <span class="status active">ready</span>
+              {% else %}
+                <span class="status expired">not ready</span>
+              {% endif %}
+            </td>
+
+            <td class="py-3 pr-4">
+              {% if row.last_arr_status == 'created' %}
+                <div class="space-y-1">
+                  <span class="status active">created</span>
+                  {% if row.last_arr_server_name %}
+                    <div class="text-xs text-emerald-200/60">{{ row.last_arr_server_name }}</div>
+                  {% endif %}
+                  {% if row.last_arr_message %}
+                    <div class="text-xs text-emerald-100/70">{{ row.last_arr_message }}</div>
+                  {% endif %}
+                </div>
+              {% elif row.last_arr_status == 'already_exists' %}
+                <div class="space-y-1">
+                  <span class="status warning">already exists</span>
+                  {% if row.last_arr_server_name %}
+                    <div class="text-xs text-emerald-200/60">{{ row.last_arr_server_name }}</div>
+                  {% endif %}
+                  {% if row.last_arr_message %}
+                    <div class="text-xs text-emerald-100/70">{{ row.last_arr_message }}</div>
+                  {% endif %}
+                </div>
+              {% elif row.last_arr_status == 'invalid' %}
+                <div class="space-y-1">
+                  <span class="status expired">invalid</span>
+                  {% if row.last_arr_server_name %}
+                    <div class="text-xs text-emerald-200/60">{{ row.last_arr_server_name }}</div>
+                  {% endif %}
+                  {% if row.last_arr_message %}
+                    <div class="text-xs text-emerald-100/70">{{ row.last_arr_message }}</div>
+                  {% endif %}
+                </div>
+              {% elif row.last_arr_status == 'error' %}
+                <div class="space-y-1">
+                  <span class="status expired">error</span>
+                  {% if row.last_arr_server_name %}
+                    <div class="text-xs text-emerald-200/60">{{ row.last_arr_server_name }}</div>
+                  {% endif %}
+                  {% if row.last_arr_message %}
+                    <div class="text-xs text-emerald-100/70">{{ row.last_arr_message }}</div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <span class="text-emerald-200/40">—</span>
+              {% endif %}
+            </td>
+
+            <td class="py-3 text-emerald-100/70">
+              {% if row.targets %}
+                <div class="space-y-3">
+                  {% for target in row.targets %}
+                    <div class="rounded-xl border border-emerald-400/10 bg-black/10 p-3">
+                      <div class="text-sm text-white">
+                        {{ target.plex_server.name }} → {{ target.section_name }}
+                      </div>
+
+                      <div class="text-xs text-emerald-200/60 mt-1">
+                        {{ target.arr_server.name if target.arr_server else 'No Arr server' }}
+                      </div>
+
+                      {% if row.last_arr_status == 'created' %}
+                        <div class="mt-3 space-y-2">
+                          <span class="status active">Already added</span>
+                          <div class="text-xs text-emerald-200/60">
+                            Last known Arr status is created. Sending again is blocked here to avoid duplicates.
+                          </div>
+                        </div>
+
+                      {% elif row.last_arr_status == 'already_exists' %}
+                        <div class="mt-3 space-y-2">
+                          <span class="status already_exists">Already exists</span>
+                          <div class="text-xs text-emerald-200/60">
+                            This title already exists in Arr. Sending again is blocked here.
+                          </div>
+                        </div>
+
+                      {% else %}
+                        <form
+                          method="post"
+                          action="{{ url_for('people.add_missing', person_id=row.person_id) }}"
+                          class="mt-3"
+                        >
+                          <input type="hidden" name="target_id" value="{{ target.id }}">
+                          <input type="hidden" name="media_kind" value="{{ row.media_kind }}">
+                          <input type="hidden" name="external_id" value="{{ row.external_id or '' }}">
+                          <input type="hidden" name="title" value="{{ row.title }}">
+                          <input type="hidden" name="year" value="{{ row.year or '' }}">
+
+                          <input type="hidden" name="return_to" value="arr_missing_titles">
+                          <input type="hidden" name="return_page" value="{{ page }}">
+                          <input type="hidden" name="return_search" value="{{ search }}">
+                          <input type="hidden" name="return_media_kind" value="{{ media_kind_filter }}">
+                          <input type="hidden" name="return_arr_ready" value="{{ arr_ready_filter }}">
+                          <input type="hidden" name="return_source" value="{{ source_filter }}">
+                          <input type="hidden" name="return_country" value="{{ country_filter }}">
+
+                          <button
+                            type="submit"
+                            class="{% if row.last_arr_status in ['invalid', 'error'] %}btn-secondary{% else %}btn-primary{% endif %} w-full"
+                          >
+                            {% if row.last_arr_status == 'invalid' %}
+                              Retry send (invalid before)
+                            {% elif row.last_arr_status == 'error' %}
+                              Retry send (error before)
+                            {% else %}
+                              Send to {{ target.arr_server.name if target.arr_server else 'Arr' }}
+                            {% endif %}
+                          </button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="text-emerald-200/40">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="11" class="py-6 text-center text-emerald-200/60">
+              No missing title found for the current filters.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="list-page-footer">
+    <div class="list-page-footer-meta">
+      {{ total_missing_titles }} row{{ 's' if total_missing_titles != 1 else '' }} total · page {{ page }} · {{ limit }} rows per page
+    </div>
+
+    <div class="list-page-footer-actions">
+      <a
+        href="{{ url_for('arr.missing_titles', search=search, media_kind=media_kind_filter, arr_ready=arr_ready_filter, source=source_filter, country=country_filter, page=(page - 1)) }}"
+        class="btn-secondary {% if not has_previous_page %}pointer-events-none opacity-50{% endif %}"
+        aria-disabled="{{ 'true' if not has_previous_page else 'false' }}"
+      >
+        Previous
+      </a>
+
+      <a
+        href="{{ url_for('arr.missing_titles', search=search, media_kind=media_kind_filter, arr_ready=arr_ready_filter, source=source_filter, country=country_filter, page=(page + 1)) }}"
+        class="btn-secondary {% if not has_next_page %}pointer-events-none opacity-50{% endif %}"
+        aria-disabled="{{ 'true' if not has_next_page else 'false' }}"
+      >
+        Next
+      </a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

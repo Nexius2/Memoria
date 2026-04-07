@@ -688,14 +688,89 @@
         <div class="space-y-4">
           <div>
             <div class="text-sm font-medium text-white mb-2">Movies</div>
-            <div class="space-y-2 text-sm text-emerald-100/80">
-              {% for item in missing_movies %}
-                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
-                  {{ item.title or item.name }}
-                  {% set item_date = item.release_date or item.first_air_date %}
-                  {% if item_date %}
-                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
-                  {% endif %}
+            <div class="space-y-3 text-sm text-emerald-100/80">
+              {% for row in movie_missing_rows %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 p-3">
+                  <div class="flex flex-col gap-3">
+                    <div>
+                      <div class="text-white font-medium">
+                        {{ row.title }}
+                        {% if row.year %}
+                          <span class="text-emerald-200/60">({{ row.year }})</span>
+                        {% endif %}
+                      </div>
+                    </div>
+
+                    {% if row.target_rows %}
+                      <div class="space-y-2">
+                        {% for target_row in row.target_rows %}
+                          {% set target = target_row.target %}
+                          <div class="rounded-lg border border-emerald-400/10 bg-black/10 p-3">
+                            <div class="text-sm text-white">
+                              {{ target.plex_server.name }} → {{ target.section_name }}
+                            </div>
+
+                            <div class="text-xs text-emerald-200/60 mt-1">
+                              {{ target.arr_server.name if target.arr_server else 'No Arr server' }}
+                            </div>
+
+                            {% if target_row.last_arr_status == 'created' %}
+                              <div class="mt-3 space-y-2">
+                                <span class="status active">Already added</span>
+                                {% if target_row.last_arr_message %}
+                                  <div class="text-xs text-emerald-100/70">{{ target_row.last_arr_message }}</div>
+                                {% endif %}
+                              </div>
+
+                            {% elif target_row.last_arr_status == 'already_exists' %}
+                              <div class="mt-3 space-y-2">
+                                <span class="status already_exists">Already exists</span>
+                                {% if target_row.last_arr_message %}
+                                  <div class="text-xs text-emerald-100/70">{{ target_row.last_arr_message }}</div>
+                                {% endif %}
+                              </div>
+
+                            {% else %}
+                              <form
+                                method="post"
+                                action="{{ url_for('people.add_missing', person_id=person.id) }}"
+                                class="mt-3"
+                              >
+                                <input type="hidden" name="target_id" value="{{ target.id }}">
+                                <input type="hidden" name="media_kind" value="movie">
+                                <input type="hidden" name="external_id" value="{{ row.external_id or '' }}">
+                                <input type="hidden" name="title" value="{{ row.title }}">
+                                <input type="hidden" name="year" value="{{ row.year or '' }}">
+
+                                <button
+                                  type="submit"
+                                  class="{% if target_row.last_arr_status in ['invalid', 'error'] %}btn-secondary{% else %}btn-primary{% endif %} w-full"
+                                >
+                                  {% if target_row.last_arr_status == 'invalid' %}
+                                    Retry send (invalid before)
+                                  {% elif target_row.last_arr_status == 'error' %}
+                                    Retry send (error before)
+                                  {% else %}
+                                    Send to {{ target.arr_server.name if target.arr_server else 'Arr' }}
+                                  {% endif %}
+                                </button>
+                              </form>
+
+                              {% if target_row.last_arr_status in ['invalid', 'error'] and target_row.last_arr_message %}
+                                <div class="mt-2 text-xs text-emerald-100/70">
+                                  {{ target_row.last_arr_message }}
+                                </div>
+                              {% endif %}
+                            {% endif %}
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <div class="text-xs text-amber-100/80">
+                        No movie Arr target configured.
+                      </div>
+                    {% endif %}
+                  </div>
                 </div>
               {% else %}
                 <div class="text-emerald-200/60">No missing movie found.</div>
@@ -705,14 +780,89 @@
 
           <div>
             <div class="text-sm font-medium text-white mb-2">Shows</div>
-            <div class="space-y-2 text-sm text-emerald-100/80">
-              {% for item in missing_shows %}
-                <div class="rounded-xl border border-emerald-400/10 bg-black/10 px-3 py-2">
-                  {{ item.name or item.title }}
-                  {% set item_date = item.first_air_date or item.release_date %}
-                  {% if item_date %}
-                    <span class="text-emerald-200/60">({{ item_date[:4] }})</span>
-                  {% endif %}
+            <div class="space-y-3 text-sm text-emerald-100/80">
+              {% for row in show_missing_rows %}
+                <div class="rounded-xl border border-emerald-400/10 bg-black/10 p-3">
+                  <div class="flex flex-col gap-3">
+                    <div>
+                      <div class="text-white font-medium">
+                        {{ row.title }}
+                        {% if row.year %}
+                          <span class="text-emerald-200/60">({{ row.year }})</span>
+                        {% endif %}
+                      </div>
+                    </div>
+
+                    {% if row.target_rows %}
+                      <div class="space-y-2">
+                        {% for target_row in row.target_rows %}
+                          {% set target = target_row.target %}
+                          <div class="rounded-lg border border-emerald-400/10 bg-black/10 p-3">
+                            <div class="text-sm text-white">
+                              {{ target.plex_server.name }} → {{ target.section_name }}
+                            </div>
+
+                            <div class="text-xs text-emerald-200/60 mt-1">
+                              {{ target.arr_server.name if target.arr_server else 'No Arr server' }}
+                            </div>
+
+                            {% if target_row.last_arr_status == 'created' %}
+                              <div class="mt-3 space-y-2">
+                                <span class="status active">Already added</span>
+                                {% if target_row.last_arr_message %}
+                                  <div class="text-xs text-emerald-100/70">{{ target_row.last_arr_message }}</div>
+                                {% endif %}
+                              </div>
+
+                            {% elif target_row.last_arr_status == 'already_exists' %}
+                              <div class="mt-3 space-y-2">
+                                <span class="status already_exists">Already exists</span>
+                                {% if target_row.last_arr_message %}
+                                  <div class="text-xs text-emerald-100/70">{{ target_row.last_arr_message }}</div>
+                                {% endif %}
+                              </div>
+
+                            {% else %}
+                              <form
+                                method="post"
+                                action="{{ url_for('people.add_missing', person_id=person.id) }}"
+                                class="mt-3"
+                              >
+                                <input type="hidden" name="target_id" value="{{ target.id }}">
+                                <input type="hidden" name="media_kind" value="show">
+                                <input type="hidden" name="external_id" value="{{ row.external_id or '' }}">
+                                <input type="hidden" name="title" value="{{ row.title }}">
+                                <input type="hidden" name="year" value="{{ row.year or '' }}">
+
+                                <button
+                                  type="submit"
+                                  class="{% if target_row.last_arr_status in ['invalid', 'error'] %}btn-secondary{% else %}btn-primary{% endif %} w-full"
+                                >
+                                  {% if target_row.last_arr_status == 'invalid' %}
+                                    Retry send (invalid before)
+                                  {% elif target_row.last_arr_status == 'error' %}
+                                    Retry send (error before)
+                                  {% else %}
+                                    Send to {{ target.arr_server.name if target.arr_server else 'Arr' }}
+                                  {% endif %}
+                                </button>
+                              </form>
+
+                              {% if target_row.last_arr_status in ['invalid', 'error'] and target_row.last_arr_message %}
+                                <div class="mt-2 text-xs text-emerald-100/70">
+                                  {{ target_row.last_arr_message }}
+                                </div>
+                              {% endif %}
+                            {% endif %}
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <div class="text-xs text-amber-100/80">
+                        No show Arr target configured.
+                      </div>
+                    {% endif %}
+                  </div>
                 </div>
               {% else %}
                 <div class="text-emerald-200/60">No missing show found.</div>

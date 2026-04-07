@@ -147,10 +147,20 @@ def _build_candidate_rows(candidates: list[DetectionCandidate]) -> list[dict]:
     for candidate in candidates:
         person = people_by_slug.get(candidate.slug)
         active_event = active_events_by_person_id.get(person.id) if person else None
+
+        candidate_priority = int(candidate.popularity_score or 0)
+        stored_web_priority = int(person.web_priority or 0) if person else 0
+        manual_priority = person.manual_priority if person else None
+        effective_priority = int(manual_priority) if manual_priority is not None else candidate_priority
+
         rows.append({
             'candidate': candidate,
             'person': person,
             'active_event': active_event,
+            'candidate_priority': candidate_priority,
+            'stored_web_priority': stored_web_priority,
+            'manual_priority': manual_priority,
+            'effective_priority': effective_priority,
         })
 
     return rows
@@ -572,23 +582,32 @@ def jobs():
     recover_stale_detection_runs()
     recover_stale_task_runs()
 
-    limit_raw = (request.args.get('limit') or '50').strip()
-    allowed_limits = {25, 50, 100, 200}
+    limit_raw = (request.args.get('limit') or '20').strip()
+    allowed_limits = {10, 20, 25, 50, 100, 200}
 
     try:
         limit = int(limit_raw)
     except ValueError:
-        limit = 50
+        limit = 20
 
     if limit not in allowed_limits:
-        limit = 50
+        limit = 20
+
+    page_raw = (request.args.get('page') or '1').strip()
+    try:
+        page = int(page_raw)
+    except ValueError:
+        page = 1
+
+    if page < 1:
+        page = 1
 
     job_type = (request.args.get('job_type') or 'all').strip()
     status_filter = (request.args.get('status') or 'all').strip()
     date_from_raw = (request.args.get('date_from') or '').strip()
     date_to_raw = (request.args.get('date_to') or '').strip()
 
-    rows = _build_job_history_rows(limit=200)
+    rows = _build_job_history_rows(limit=1000)
 
     if job_type != 'all':
         rows = [row for row in rows if row['job_type'] == job_type]
@@ -616,12 +635,27 @@ def jobs():
         except ValueError:
             date_to_raw = ''
 
-    rows = rows[:limit]
+    total_rows = len(rows)
+    total_pages = max(1, (total_rows + limit - 1) // limit)
+
+    if page > total_pages:
+        page = total_pages
+
+    start = (page - 1) * limit
+    end = start + limit
+    rows = rows[start:end]
 
     return render_template(
         'jobs.html',
         job_rows=rows,
         limit=limit,
+        page=page,
+        total_pages=total_pages,
+        total_rows=total_rows,
+        has_prev=(page > 1),
+        has_next=(page < total_pages),
+        prev_page=(page - 1),
+        next_page=(page + 1),
         job_type=job_type,
         status_filter=status_filter,
         date_from=date_from_raw,
@@ -630,16 +664,25 @@ def jobs():
 
 @bp.get('/logs')
 def logs():
-    limit_raw = (request.args.get('limit') or '100').strip()
-    allowed_limits = {25, 50, 100, 200}
+    limit_raw = (request.args.get('limit') or '20').strip()
+    allowed_limits = {20, 25, 50, 100, 200}
 
     try:
         limit = int(limit_raw)
     except ValueError:
-        limit = 100
+        limit = 20
 
     if limit not in allowed_limits:
-        limit = 100
+        limit = 20
+
+    page_raw = (request.args.get('page') or '1').strip()
+    try:
+        page = int(page_raw)
+    except ValueError:
+        page = 1
+
+    if page < 1:
+        page = 1
 
     level = (request.args.get('level') or 'all').strip()
     source = (request.args.get('source') or 'all').strip()
@@ -668,13 +711,28 @@ def logs():
         except ValueError:
             date_to_raw = ''
 
-    raw_log_rows = query.limit(limit).all()
+    total_rows = query.count()
+    total_pages = max(1, (total_rows + limit - 1) // limit)
+
+    if page > total_pages:
+        page = total_pages
+
+    start = (page - 1) * limit
+
+    raw_log_rows = query.offset(start).limit(limit).all()
     log_rows = _build_app_logs_rows(raw_log_rows)
 
     return render_template(
         'logs.html',
         log_rows=log_rows,
         limit=limit,
+        page=page,
+        total_pages=total_pages,
+        total_rows=total_rows,
+        has_prev=(page > 1),
+        has_next=(page < total_pages),
+        prev_page=(page - 1),
+        next_page=(page + 1),
         level=level,
         source=source,
         date_from=date_from_raw,

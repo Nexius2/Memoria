@@ -35,14 +35,56 @@
     Memoria
   </h1>
 </div>
-        <nav class="flex flex-wrap gap-2 text-sm">
-          <a class="nav-pill" href="{{ url_for('main.dashboard') }}">Dashboard</a>
-          <a class="nav-pill" href="{{ url_for('main.jobs') }}">Jobs</a>
-          <a class="nav-pill" href="{{ url_for('main.logs') }}">Logs</a>
-          <a class="nav-pill" href="{{ url_for('people.index') }}">People</a>
-          <a class="nav-pill" href="{{ url_for('servers.index') }}">Plex</a>
-          <a class="nav-pill" href="{{ url_for('arr.index') }}">Arr</a>
-          <a class="nav-pill" href="{{ url_for('settings.index') }}">Settings</a>
+        {% set current_endpoint = request.endpoint or '' %}
+        <nav class="nav-tabs" aria-label="Primary navigation">
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'main.dashboard' else '' }}"
+            href="{{ url_for('main.dashboard') }}"
+          >
+            <span>Dashboard</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'main.jobs' else '' }}"
+            href="{{ url_for('main.jobs') }}"
+          >
+            <span>Jobs</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'main.logs' else '' }}"
+            href="{{ url_for('main.logs') }}"
+          >
+            <span>Logs</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'people.index' or current_endpoint == 'people.detail' else '' }}"
+            href="{{ url_for('people.index') }}"
+          >
+            <span>People</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'servers.index' else '' }}"
+            href="{{ url_for('servers.index') }}"
+          >
+            <span>Plex</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'arr.index' else '' }}"
+            href="{{ url_for('arr.index') }}"
+          >
+            <span>Arr</span>
+          </a>
+
+          <a
+            class="nav-tab {{ 'is-active' if current_endpoint == 'settings.index' else '' }}"
+            href="{{ url_for('settings.index') }}"
+          >
+            <span>Settings</span>
+          </a>
         </nav>
       </div>
     </header>
@@ -61,6 +103,14 @@
 
     {% block content %}{% endblock %}
   </div>
+
+  {% if app_version %}
+    <div class="fixed bottom-3 right-4 z-40 pointer-events-none">
+      <div class="rounded-full border border-emerald-400/15 bg-emerald-950/80 px-3 py-1 text-[11px] tracking-wide text-emerald-200/55 backdrop-blur-sm shadow-lg">
+        v{{ app_version }}
+      </div>
+    </div>
+  {% endif %}
 
   <!-- Global confirm modal -->
   <div

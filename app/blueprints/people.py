@@ -502,6 +502,12 @@ def _build_people_rows(people: list[Person]) -> list[dict]:
         missing_shows_count = len(missing_shows)
         missing_total_count = missing_movies_count + missing_shows_count
 
+        candidate_priority = candidate_priority_by_slug.get(person.slug)
+        stored_web_priority = int(person.web_priority or 0)
+        effective_priority = int(person.manual_priority) if person.manual_priority is not None else (
+            candidate_priority if candidate_priority is not None else stored_web_priority
+        )
+
         rows.append({
             'person': person,
             'active_event': active_event,
@@ -512,8 +518,9 @@ def _build_people_rows(people: list[Person]) -> list[dict]:
             'is_ignored': person.is_ignored_now,
             'is_forced': person.force_publish,
             'manual_priority': person.manual_priority,
-            'candidate_priority': candidate_priority_by_slug.get(person.slug),
-            'effective_priority': candidate_priority_by_slug.get(person.slug, int(person.web_priority or 0)),
+            'candidate_priority': candidate_priority,
+            'stored_web_priority': stored_web_priority,
+            'effective_priority': effective_priority,
             'in_event_label': in_event_label,
             'days_left': days_left,
             'missing_movies_count': missing_movies_count,
@@ -874,6 +881,22 @@ def _merge_people(source: Person, target: Person) -> None:
 
     db.session.delete(source)
 
+def _redirect_after_people_inline_action(person: Person):
+    return_to = (request.form.get('return_to') or '').strip()
+
+    if return_to == 'people_index':
+        return redirect(url_for(
+            'people.index',
+            q=(request.form.get('return_q') or '').strip(),
+            status=(request.form.get('return_status') or 'all').strip() or 'all',
+            source=(request.form.get('return_source') or 'all').strip() or 'all',
+            missing=(request.form.get('return_missing') or 'all').strip() or 'all',
+            sort=(request.form.get('return_sort') or 'death_desc').strip() or 'death_desc',
+            page=(request.form.get('return_page') or '1').strip() or '1',
+        ))
+
+    return redirect(url_for('people.detail', person_id=person.id))
+
 @bp.post('/<int:person_id>/refresh-metadata')
 def refresh_metadata(person_id: int):
     from ..services.scheduler_service import log_app_event
@@ -883,7 +906,7 @@ def refresh_metadata(person_id: int):
 
     if not settings.tmdb_api_key:
         flash('TMDb API key is not configured.', 'warning')
-        return redirect(url_for('people.detail', person_id=person.id))
+        return _redirect_after_people_inline_action(person)
 
     app_obj = current_app._get_current_object()
     job_id = f'refresh_metadata_{person.id}_{int(datetime.utcnow().timestamp())}'
@@ -905,7 +928,7 @@ def refresh_metadata(person_id: int):
         f'TMDb refresh started in background for "{person.name}". Refresh the page later to see the updated metadata.',
         'success',
     )
-    return redirect(url_for('people.detail', person_id=person.id))
+    return _redirect_after_people_inline_action(person)
 
 @bp.get('/<int:person_id>/tmdb-candidates')
 def tmdb_candidates(person_id: int):
@@ -1102,7 +1125,7 @@ def refresh_missing_titles(person_id: int):
 
     if not settings.tmdb_api_key:
         flash('TMDb API key is not configured.', 'warning')
-        return redirect(url_for('people.detail', person_id=person.id))
+        return _redirect_after_people_inline_action(person)
 
     app_obj = current_app._get_current_object()
     job_id = f'refresh_missing_titles_{person.id}_{int(datetime.utcnow().timestamp())}'
@@ -1124,7 +1147,63 @@ def refresh_missing_titles(person_id: int):
         f'Missing titles refresh started in background for "{person.name}". Refresh the page later to see the updated result.',
         'success',
     )
-    return redirect(url_for('people.detail', person_id=person.id))
+    return _redirect_after_people_inline_action(person)
+
+@bp.post('/<int:person_id>/quick-action')
+def quick_action(person_id: int):
+    person = Person.query.get_or_404(person_id)
+    action = (request.form.get('action') or '').strip()
+
+    try:
+        if action == 'pin':
+            if person.is_pinned:
+                flash(f'"{person.name}" is already pinned.', 'info')
+            else:
+                person.is_pinned = True
+                db.session.commit()
+                flash(f'"{person.name}" pinned.', 'success')
+
+        elif action == 'unpin':
+            if not person.is_pinned:
+                flash(f'"{person.name}" is already unpinned.', 'info')
+            else:
+                person.is_pinned = False
+                db.session.commit()
+                flash(f'"{person.name}" unpinned.', 'success')
+
+        elif action == 'exclude':
+            changed = False
+
+            if not person.exclude_from_auto:
+                person.exclude_from_auto = True
+                changed = True
+
+            if person.ignore_until is not None:
+                person.ignore_until = None
+                changed = True
+
+            if changed:
+                db.session.commit()
+                flash(f'"{person.name}" excluded.', 'success')
+            else:
+                flash(f'"{person.name}" is already excluded.', 'info')
+
+        elif action == 'unexclude':
+            if not person.exclude_from_auto:
+                flash(f'"{person.name}" is already included.', 'info')
+            else:
+                person.exclude_from_auto = False
+                db.session.commit()
+                flash(f'"{person.name}" unexcluded.', 'success')
+
+        else:
+            flash('Invalid quick action.', 'danger')
+
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Quick action failed: {exc}', 'danger')
+
+    return _redirect_after_people_inline_action(person)
 
 @bp.post('/<int:person_id>/merge-into')
 def merge_into(person_id: int):
@@ -1373,6 +1452,110 @@ def _load_tmdb_person_photo(person: Person, settings: AppSettings, tmdb_match: d
     except Exception:
         return None
 
+def _normalize_arr_title_for_detail(value: str) -> str:
+    return ' '.join(
+        ''.join(ch.lower() if ch.isalnum() else ' ' for ch in (value or '')).split()
+    )
+
+
+def _build_person_missing_arr_status_map(person: Person) -> dict[tuple, ArrActivity]:
+    activity_map: dict[tuple, ArrActivity] = {}
+
+    activities = sorted(
+        person.arr_activities or [],
+        key=lambda activity: (
+            activity.created_at or datetime.min,
+            activity.id or 0,
+        ),
+        reverse=True,
+    )
+
+    for activity in activities:
+        target_id = activity.library_target_id
+        if not target_id:
+            continue
+
+        external_key = (
+            activity.media_kind,
+            target_id,
+            'external',
+            activity.external_id,
+        )
+        title_key = (
+            activity.media_kind,
+            target_id,
+            'title',
+            _normalize_arr_title_for_detail(activity.title),
+            activity.year,
+        )
+
+        if activity.external_id is not None and external_key not in activity_map:
+            activity_map[external_key] = activity
+
+        if title_key not in activity_map:
+            activity_map[title_key] = activity
+
+    return activity_map
+
+
+def _build_missing_item_target_statuses(
+    *,
+    items: list,
+    media_kind: str,
+    targets: list[LibraryTarget],
+    activity_map: dict[tuple, ArrActivity],
+) -> list[dict]:
+    rows: list[dict] = []
+
+    for item in items:
+        item_title = item.get('title') or item.get('name') or 'Unknown title'
+        item_date = item.get('release_date') or item.get('first_air_date') or ''
+        item_year_raw = item_date[:4]
+        item_year = int(item_year_raw) if item_year_raw.isdigit() else None
+        item_external_id = item.get('id')
+
+        target_rows = []
+
+        for target in targets:
+            activity = None
+
+            if item_external_id is not None:
+                activity = activity_map.get(
+                    (media_kind, target.id, 'external', item_external_id)
+                )
+
+
+
+            if activity is None:
+                activity = activity_map.get(
+                    (
+                        media_kind,
+                        target.id,
+                        'title',
+                        _normalize_arr_title_for_detail(item_title),
+                        item_year,
+                    )
+                )
+
+            target_rows.append({
+                'target': target,
+                'activity': activity,
+                'last_arr_status': activity.status if activity else None,
+                'last_arr_message': activity.message if activity else None,
+                'last_arr_created_at': activity.created_at if activity else None,
+            })
+
+        rows.append({
+            'item': item,
+            'title': item_title,
+            'date': item_date,
+            'year': item_year,
+            'external_id': item_external_id,
+            'target_rows': target_rows,
+        })
+
+    return rows
+
 @bp.route('/<int:person_id>')
 def detail(person_id: int):
     person = (
@@ -1405,6 +1588,42 @@ def detail(person_id: int):
         .all()
     )
 
+    movie_library_targets = [
+        target for target in library_targets
+        if (
+            target.media_type == 'movie'
+            and target.arr_server_id
+            and target.arr_server
+            and target.arr_server.enabled
+        )
+    ]
+
+    show_library_targets = [
+        target for target in library_targets
+        if (
+            target.media_type == 'show'
+            and target.arr_server_id
+            and target.arr_server
+            and target.arr_server.enabled
+        )
+    ]
+
+    missing_activity_map = _build_person_missing_arr_status_map(person)
+
+    movie_missing_rows = _build_missing_item_target_statuses(
+        items=missing_movies,
+        media_kind='movie',
+        targets=movie_library_targets,
+        activity_map=missing_activity_map,
+    )
+
+    show_missing_rows = _build_missing_item_target_statuses(
+        items=missing_shows,
+        media_kind='show',
+        targets=show_library_targets,
+        activity_map=missing_activity_map,
+    )
+
     if settings.tmdb_api_key:
         try:
             tmdb_match, tmdb_credits = _load_tmdb_context(person, settings)
@@ -1424,7 +1643,23 @@ def detail(person_id: int):
 
         except Exception as exc:
             flash(f'TMDB lookup failed: {exc}', 'warning')
-            
+
+    missing_activity_map = _build_person_missing_arr_status_map(person)
+
+    movie_missing_rows = _build_missing_item_target_statuses(
+        items=missing_movies,
+        media_kind='movie',
+        targets=movie_library_targets,
+        activity_map=missing_activity_map,
+    )
+
+    show_missing_rows = _build_missing_item_target_statuses(
+        items=missing_shows,
+        media_kind='show',
+        targets=show_library_targets,
+        activity_map=missing_activity_map,
+    )
+
     duplicates = find_possible_duplicates(person)
 
     return render_template(
@@ -1437,7 +1672,11 @@ def detail(person_id: int):
         person_photo_url=person_photo_url,
         missing_movies=missing_movies,
         missing_shows=missing_shows,
+        movie_missing_rows=movie_missing_rows,
+        show_missing_rows=show_missing_rows,
         library_targets=library_targets,
+        movie_library_targets=movie_library_targets,
+        show_library_targets=show_library_targets,
         duplicates=duplicates,
     )
 
@@ -1648,6 +1887,24 @@ def _log_arr_activity(
 
     return activity
 
+
+def _redirect_after_add_missing(person: Person):
+    return_to = (request.form.get('return_to') or '').strip()
+
+    if return_to == 'arr_missing_titles':
+        return redirect(url_for(
+            'arr.missing_titles',
+            page=(request.form.get('return_page') or '1').strip() or '1',
+            search=(request.form.get('return_search') or '').strip(),
+            media_kind=(request.form.get('return_media_kind') or 'all').strip() or 'all',
+            arr_ready=(request.form.get('return_arr_ready') or 'all').strip() or 'all',
+            source=(request.form.get('return_source') or 'all').strip() or 'all',
+            country=(request.form.get('return_country') or 'all').strip() or 'all',
+        ))
+
+    return redirect(url_for('people.detail', person_id=person.id))
+
+
 @bp.post('/<int:person_id>/add-missing')
 def add_missing(person_id: int):
     person = Person.query.get_or_404(person_id)
@@ -1674,7 +1931,7 @@ def add_missing(person_id: int):
             result=result,
         )
         flash(result['message'], 'warning')
-        return redirect(url_for('people.detail', person_id=person.id))
+        return _redirect_after_add_missing(person)
 
     service = ArrService(target.arr_server)
 
@@ -1711,7 +1968,7 @@ def add_missing(person_id: int):
     else:
         flash(f'Failed to send to Arr: {result["message"]}', 'danger')
 
-    return redirect(url_for('people.detail', person_id=person.id))
+    return _redirect_after_add_missing(person)
 
 
 

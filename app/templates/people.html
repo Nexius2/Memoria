@@ -56,7 +56,10 @@
 
     <div class="flex flex-col gap-4 mb-4">
 	<div class="flex items-center justify-between gap-4">
-	  <h2 class="text-xl font-semibold text-white">Known people</h2>
+	  <h2 class="text-xl font-semibold text-white section-title-with-icon">
+	    <span class="section-title-icon">◉</span>
+	    <span>Known people</span>
+	  </h2>
 	  <div class="text-xs text-emerald-200/60">
 		{{ page_rows_start }}–{{ page_rows_end }} / {{ total_people_count }} shown
 	  </div>
@@ -66,10 +69,20 @@
         id="people-filters-form"
         method="get"
         action="{{ url_for('people.index') }}"
-        class="space-y-3"
+        class="filter-toolbar"
       >
+        <div class="filter-toolbar-header">
+          <div>
+            <div class="filter-toolbar-title">Filters</div>
+            <div class="filter-toolbar-subtitle">Search, sort and narrow the list without mixing this with row actions.</div>
+          </div>
+          <div class="filter-toolbar-meta">
+            Auto-save enabled for current People filters
+          </div>
+        </div>
+
         <div class="flex items-start justify-between gap-3">
-          <div class="grid flex-1 grid-cols-1 md:grid-cols-4 gap-3">
+          <div class="filter-toolbar-grid cols-5 flex-1">
             <div class="md:col-span-2">
               <label class="field-label">Search</label>
               <input
@@ -127,7 +140,7 @@
           <button
             type="button"
             id="people-filters-reset"
-            class="icon-reset-button mt-7"
+            class="icon-reset-button mt-[1.55rem]"
             title="Reset filters"
             aria-label="Reset filters"
           >
@@ -181,184 +194,217 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="list-table-wrap">
+        <table class="list-table list-table-row-hover list-table-row-clickable">
           <thead>
-          <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
-            <th class="py-3 pr-3 w-10">
-              <input id="select-all-people" type="checkbox">
-            </th>
-            <th class="py-3">Name</th>
-            <th class="py-3">Death date</th>
-            <th class="py-3">Country</th>
-            <th class="py-3">Source</th>
-            <th class="py-3">Missing titles</th>
-            <th class="py-3">Days left</th>
-            <th class="py-3">Status</th>
-          </tr>
+            <tr>
+              <th class="w-10">
+                <input id="select-all-people" type="checkbox">
+              </th>
+              <th>Name</th>
+              <th>Death date</th>
+              <th>Country</th>
+              <th>Source</th>
+              <th>Missing titles</th>
+              <th>Days left</th>
+              <th>Status</th>
+            </tr>
           </thead>
           <tbody>
-          {% for row in person_rows %}
-            {% set person = row.person %}
-            <tr
-              class="border-b border-emerald-400/5 align-top cursor-pointer hover:bg-emerald-400/5 transition-colors"
-              data-person-url="{{ url_for('people.detail', person_id=person.id) }}"
-            >
-              <td class="py-3 pr-3">
-                <input class="people-checkbox" type="checkbox" name="person_ids" value="{{ person.id }}">
-              </td>
+            {% for row in person_rows %}
+              {% set person = row.person %}
+              <tr data-person-url="{{ url_for('people.detail', person_id=person.id) }}">
+                <td>
+                  <input class="people-checkbox" type="checkbox" name="person_ids" value="{{ person.id }}">
+                </td>
 
-              <td class="py-3">
-                <span class="text-white font-semibold">
-                  {{ person.name }}
-                </span>
+                <td class="min-w-[420px]">
+                  <div class="list-cell-title">{{ person.name }}</div>
+                  <div class="list-pill-row mt-2">
+                    {% if row.status == 'active_event' %}
+                      <span class="table-status-badge table-status-badge--active">Active event</span>
+                    {% elif row.status == 'candidate' %}
+                      <span class="table-status-badge table-status-badge--candidate">Candidate</span>
+                    {% else %}
+                      <span class="table-status-badge table-status-badge--known">Known person</span>
+                    {% endif %}
 
-                <div class="mt-2 flex flex-wrap gap-2">
-                  {% if row.status == 'active_event' %}
-                    <span class="table-status-badge table-status-badge--active">
-                      Active event
-                    </span>
-                  {% elif row.status == 'candidate' %}
-                    <span class="table-status-badge table-status-badge--candidate">
-                      Candidate
-                    </span>
-                  {% else %}
-                    <span class="table-status-badge table-status-badge--known">
-                      Known person
-                    </span>
-                  {% endif %}
+                    {% if row.is_pinned %}
+                      <span class="inline-tag inline-tag--violet">Pinned</span>
+                    {% endif %}
 
-                  {% if row.is_pinned %}
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-violet-500/20 text-violet-200 border border-violet-400/20">
-                      Pinned
-                    </span>
-                  {% endif %}
+                    {% if row.is_forced %}
+                      <span class="inline-tag inline-tag--amber">Forced publish</span>
+                    {% endif %}
 
-                  {% if row.is_forced %}
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-200 border border-amber-400/20">
-                      Forced publish
-                    </span>
-                  {% endif %}
+                    {% if row.is_excluded %}
+                      <span class="inline-tag inline-tag--rose">Excluded</span>
+                    {% endif %}
 
-                  {% if row.is_excluded %}
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-rose-500/20 text-rose-200 border border-rose-400/20">
-                      Excluded
-                    </span>
-                  {% endif %}
+                    {% if row.is_ignored %}
+                      <span class="inline-tag inline-tag--slate">Ignored</span>
+                    {% endif %}
 
-                  {% if row.is_ignored %}
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-slate-500/20 text-slate-200 border border-slate-400/20">
-                      Ignored
-                    </span>
-                  {% endif %}
+                    {% if row.manual_priority is not none %}
+                      <span class="inline-tag inline-tag--orange">Manual {{ row.manual_priority }}</span>
+                    {% endif %}
 
-                  {% if row.manual_priority is not none %}
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-orange-500/20 text-orange-200 border border-orange-400/20">
-                      Priority {{ row.manual_priority }}
+                    <span class="inline-tag inline-tag--cyan">
+                      Web {{ row.candidate_priority if row.candidate_priority is not none else row.stored_web_priority }}
                     </span>
-                  {% endif %}
-                </div>
-              </td>
 
-              <td class="py-3">{{ person.death_date }}</td>
-              <td class="py-3">{{ person.country or '—' }}</td>
-              <td class="py-3">{{ person.source }}</td>
-
-              <td class="py-3">
-                <div class="flex flex-col gap-2">
-                  <div class="flex flex-wrap gap-2">
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-cyan-500/20 text-cyan-200 border border-cyan-400/20">
-                      {{ row.missing_movies_count }} movies
-                    </span>
-                    <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-indigo-500/20 text-indigo-200 border border-indigo-400/20">
-                      {{ row.missing_shows_count }} shows
+                    <span class="inline-tag inline-tag--emerald">
+                      Effective {{ row.effective_priority }}
                     </span>
                   </div>
 
-                  <div class="text-xs">
-                    {% if row.missing_titles_status == 'ready' %}
-                      <div class="text-emerald-200/80">
-                        Scan ready
-                        {% if row.missing_titles_scanned_at %}
-						·
-						<span
-						  data-local-datetime="{{ row.missing_titles_scanned_at|datetime_utc_iso if row.missing_titles_scanned_at else '' }}"
-						  data-local-datetime-seconds="0"
-						>
-						  {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
-						</span>
-                        {% endif %}
-                      </div>
-                    {% elif row.missing_titles_status == 'error' %}
-                      <div class="text-red-200/80">
-                        Scan error
-                      </div>
-                      {% if row.missing_titles_error %}
-                        <div class="text-red-200/60 mt-1">
-                          {{ row.missing_titles_error }}
-                        </div>
-                      {% endif %}
-                    {% elif row.missing_titles_status == 'disabled' %}
-                      <div class="text-amber-200/80">
-                        Scan disabled
-                      </div>
+                  <div class="list-cell-subtitle mt-2">
+                    Threshold {{ settings.min_people_priority_display }}
+                    {% if row.manual_priority is not none %}
+                      · manual override active
+                    {% elif row.candidate_priority is not none %}
+                      · using current web candidate score
                     {% else %}
-                      <div class="text-emerald-100/60">
-                        Scan pending
-                      </div>
+                      · using stored web score
                     {% endif %}
                   </div>
-                </div>
-              </td>
 
+                  <div class="row-actions mt-3">
+                    <form method="post" action="{{ url_for('people.refresh_metadata', person_id=person.id) }}">
+                      <input type="hidden" name="return_to" value="people_index">
+                      <input type="hidden" name="return_q" value="{{ q or '' }}">
+                      <input type="hidden" name="return_status" value="{{ status_filter }}">
+                      <input type="hidden" name="return_source" value="{{ source_filter }}">
+                      <input type="hidden" name="return_missing" value="{{ missing_filter }}">
+                      <input type="hidden" name="return_sort" value="{{ sort_by }}">
+                      <input type="hidden" name="return_page" value="{{ page }}">
+                      <button type="submit" class="row-action-btn">Refresh TMDb</button>
+                    </form>
 
+                    <form method="post" action="{{ url_for('people.refresh_missing_titles', person_id=person.id) }}">
+                      <input type="hidden" name="return_to" value="people_index">
+                      <input type="hidden" name="return_q" value="{{ q or '' }}">
+                      <input type="hidden" name="return_status" value="{{ status_filter }}">
+                      <input type="hidden" name="return_source" value="{{ source_filter }}">
+                      <input type="hidden" name="return_missing" value="{{ missing_filter }}">
+                      <input type="hidden" name="return_sort" value="{{ sort_by }}">
+                      <input type="hidden" name="return_page" value="{{ page }}">
+                      <button type="submit" class="row-action-btn">Refresh missing</button>
+                    </form>
 
-              <td class="py-3">
-                {% if row.days_left is not none %}
-                  <span class="text-white">{{ row.days_left }}</span>
-                {% else %}
-                  <span class="text-emerald-100/60">—</span>
-                {% endif %}
-              </td>
+                    <form method="post" action="{{ url_for('people.quick_action', person_id=person.id) }}">
+                      <input type="hidden" name="action" value="{{ 'unpin' if row.is_pinned else 'pin' }}">
+                      <input type="hidden" name="return_to" value="people_index">
+                      <input type="hidden" name="return_q" value="{{ q or '' }}">
+                      <input type="hidden" name="return_status" value="{{ status_filter }}">
+                      <input type="hidden" name="return_source" value="{{ source_filter }}">
+                      <input type="hidden" name="return_missing" value="{{ missing_filter }}">
+                      <input type="hidden" name="return_sort" value="{{ sort_by }}">
+                      <input type="hidden" name="return_page" value="{{ page }}">
+                      <button type="submit" class="row-action-btn">
+                        {{ 'Unpin' if row.is_pinned else 'Pin' }}
+                      </button>
+                    </form>
 
-              <td class="py-3">
-                {% if row.active_event %}
-                  <div class="text-emerald-100/80">
-                    Active until {{ row.active_event.end_date }}
+                    <form method="post" action="{{ url_for('people.quick_action', person_id=person.id) }}">
+                      <input type="hidden" name="action" value="{{ 'unexclude' if row.is_excluded else 'exclude' }}">
+                      <input type="hidden" name="return_to" value="people_index">
+                      <input type="hidden" name="return_q" value="{{ q or '' }}">
+                      <input type="hidden" name="return_status" value="{{ status_filter }}">
+                      <input type="hidden" name="return_source" value="{{ source_filter }}">
+                      <input type="hidden" name="return_missing" value="{{ missing_filter }}">
+                      <input type="hidden" name="return_sort" value="{{ sort_by }}">
+                      <input type="hidden" name="return_page" value="{{ page }}">
+                      <button type="submit" class="row-action-btn">
+                        {{ 'Unexclude' if row.is_excluded else 'Exclude' }}
+                      </button>
+                    </form>
                   </div>
-                {% elif person.ignore_until %}
-                  <div class="text-emerald-100/80">
-                    Ignored until {{ person.ignore_until }}
+                </td>
+
+                <td class="list-cell-muted whitespace-nowrap">
+                  {{ person.death_date or '—' }}
+                </td>
+
+                <td class="list-cell-muted whitespace-nowrap">
+                  {{ person.country or '—' }}
+                </td>
+
+                <td class="list-cell-soft whitespace-nowrap">
+                  {{ person.source or '—' }}
+                </td>
+
+                <td class="min-w-[220px]">
+                  <div class="list-pill-row">
+                    <span class="inline-tag inline-tag--cyan">{{ row.missing_movies_count }} movies</span>
+                    <span class="inline-tag inline-tag--indigo">{{ row.missing_shows_count }} shows</span>
                   </div>
-                {% else %}
-                  <div class="text-emerald-100/60">—</div>
-                {% endif %}
-              </td>
 
+                  <div class="list-cell-subtitle mt-2">
+                    {% if row.missing_titles_status == 'ready' %}
+                      <span class="text-emerald-200/80">Scan ready</span>
+                      {% if row.missing_titles_scanned_at %}
+                        ·
+                        <span
+                          data-local-datetime="{{ row.missing_titles_scanned_at|datetime_utc_iso if row.missing_titles_scanned_at else '' }}"
+                          data-local-datetime-seconds="0"
+                        >
+                          {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
+                        </span>
+                      {% endif %}
+                    {% elif row.missing_titles_status == 'error' %}
+                      <span class="text-red-200/80">Scan error</span>
+                      {% if row.missing_titles_error %}
+                        <div class="mt-1 text-red-200/60">{{ row.missing_titles_error }}</div>
+                      {% endif %}
+                    {% elif row.missing_titles_status == 'disabled' %}
+                      <span class="text-amber-200/80">Scan disabled</span>
+                    {% else %}
+                      <span class="text-emerald-100/60">Scan pending</span>
+                    {% endif %}
+                  </div>
+                </td>
 
-            </tr>
-          {% else %}
-            <tr>
-              <td colspan="8" class="py-8 text-center text-emerald-200/60">
-                No people match the current filters.
-              </td>
-            </tr>
-          {% endfor %}
+                <td class="whitespace-nowrap">
+                  {% if row.days_left is not none %}
+                    <span class="list-cell-title">{{ row.days_left }}</span>
+                  {% else %}
+                    <span class="list-cell-soft">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="min-w-[180px]">
+                  {% if row.active_event %}
+                    <div class="list-cell-muted">Active until {{ row.active_event.end_date }}</div>
+                  {% elif person.ignore_until %}
+                    <div class="list-cell-muted">Ignored until {{ person.ignore_until }}</div>
+                  {% else %}
+                    <div class="list-cell-soft">—</div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="8" class="py-8 text-center text-emerald-200/60">
+                  No people match the current filters.
+                </td>
+              </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
     </form>
 
-    <div class="mt-4 flex items-center justify-between gap-3">
-      <div class="text-xs text-emerald-200/60">
-        Page {{ page }} / {{ total_pages }}
+    <div class="list-page-footer">
+      <div class="list-page-footer-meta">
+        {{ total_people_count }} row{{ 's' if total_people_count != 1 else '' }} total · page {{ page }} / {{ total_pages }}
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="list-page-footer-actions">
         {% if page > 1 %}
           <a
             class="btn-secondary"
-            href="{{ url_for('people.index', status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page-1) }}"
+            href="{{ url_for('people.index', q=q, status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page-1) }}"
           >
             Previous
           </a>
@@ -369,7 +415,7 @@
         {% if page < total_pages %}
           <a
             class="btn-secondary"
-            href="{{ url_for('people.index', status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page+1) }}"
+            href="{{ url_for('people.index', q=q, status=status_filter, source=source_filter, missing=missing_filter, sort=sort_by, page=page+1) }}"
           >
             Next
           </a>
