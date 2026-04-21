@@ -625,3 +625,120 @@ input[data-secret-masked="1"] {
   -webkit-text-security: disc;
   text-security: disc;
 }
+.person-detail-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+
+.person-detail-block {
+  min-width: 0;
+}
+
+.person-detail-muted-box {
+  border: 1px solid rgba(52,211,153,.10);
+  background: rgba(255,255,255,.02);
+  border-radius: 1rem;
+  padding: .85rem 1rem;
+}
+
+.person-detail-scroll {
+  max-height: 34rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: .2rem;
+}
+
+.person-detail-scroll--tall {
+  max-height: 42rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: .2rem;
+}
+
+.person-detail-scroll--table {
+  max-height: 30rem;
+  overflow: auto;
+}
+
+.person-detail-scroll::-webkit-scrollbar,
+.person-detail-scroll--tall::-webkit-scrollbar,
+.person-detail-scroll--table::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.person-detail-scroll::-webkit-scrollbar-thumb,
+.person-detail-scroll--tall::-webkit-scrollbar-thumb,
+.person-detail-scroll--table::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,.25);
+  border-radius: 999px;
+}
+
+.person-detail-scroll::-webkit-scrollbar-track,
+.person-detail-scroll--tall::-webkit-scrollbar-track,
+.person-detail-scroll--table::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.person-detail-panel-self-start {
+  align-self: start;
+}
+
+.person-detail-two-column-scroll {
+  max-height: 44rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: .25rem;
+}
+
+.person-detail-two-column-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.person-detail-two-column-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,.25);
+  border-radius: 999px;
+}
+
+.person-detail-two-column-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.person-detail-missing-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.person-detail-missing-box {
+  min-height: 0;
+}
+
+.person-detail-missing-box-body {
+  max-height: 26rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: .2rem;
+}
+
+.person-detail-missing-box-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.person-detail-missing-box-body::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,.25);
+  border-radius: 999px;
+}
+
+.person-detail-missing-box-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (min-width: 1280px) {
+  .person-detail-missing-split {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}

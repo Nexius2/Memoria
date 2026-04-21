@@ -581,7 +581,17 @@ def index():
 
         person_rows = filtered_rows
 
-    if status_filter != 'all':
+    if status_filter == 'excluded':
+        person_rows = [
+            row for row in person_rows
+            if row['person'].exclude_from_auto
+        ]
+    elif status_filter == 'ignored':
+        person_rows = [
+            row for row in person_rows
+            if row['person'].is_ignored_now
+        ]
+    elif status_filter != 'all':
         person_rows = [
             row for row in person_rows
             if row['status'] == status_filter
@@ -692,6 +702,77 @@ def index():
         total_pages=total_pages,
         page_rows_start=page_rows_start,
         page_rows_end=page_rows_end,
+    )
+
+
+@bp.route('/review')
+def review():
+    settings = AppSettings.get_or_create()
+
+    people = (
+        Person.query
+        .options(joinedload(Person.events))
+        .all()
+    )
+
+    person_rows = _build_people_rows(people)
+    duplicate_groups = _build_duplicate_groups(people)
+
+    manual_review_rows = []
+    failed_scan_rows = []
+    excluded_backlog_rows = []
+    ignored_backlog_rows = []
+
+    for row in person_rows:
+        person = row['person']
+
+        if settings.tmdb_api_key and not person.tmdb_person_id:
+            manual_review_rows.append(row)
+
+        if row['missing_titles_status'] == 'error':
+            failed_scan_rows.append(row)
+
+        if person.exclude_from_auto and row['missing_total_count'] > 0:
+            excluded_backlog_rows.append(row)
+
+        if person.is_ignored_now and row['missing_total_count'] > 0:
+            ignored_backlog_rows.append(row)
+
+    def _sort_review_rows(rows: list[dict]) -> None:
+        rows.sort(
+            key=lambda row: (
+                1 if row['person'].is_pinned else 0,
+                row['effective_priority'],
+                row['missing_total_count'],
+                row['missing_movies_count'],
+                row['missing_shows_count'],
+                row['person'].death_date or date.min,
+                (row['person'].name or '').lower(),
+            ),
+            reverse=True,
+        )
+
+    _sort_review_rows(manual_review_rows)
+    _sort_review_rows(failed_scan_rows)
+    _sort_review_rows(excluded_backlog_rows)
+    _sort_review_rows(ignored_backlog_rows)
+
+    duplicate_groups.sort(
+        key=lambda group: (
+            len(group.get('people') or []),
+            group.get('reason') or '',
+        ),
+        reverse=True,
+    )
+
+    return render_template(
+        'people_review.html',
+        settings=settings,
+        manual_review_rows=manual_review_rows,
+        failed_scan_rows=failed_scan_rows,
+        excluded_backlog_rows=excluded_backlog_rows,
+        ignored_backlog_rows=ignored_backlog_rows,
+        duplicate_groups=duplicate_groups,
     )
 
 
@@ -966,6 +1047,8 @@ def tmdb_candidates(person_id: int):
 @bp.post('/<int:person_id>/link-tmdb')
 @bp.post('/<int:person_id>/select-tmdb-match')
 def link_tmdb(person_id: int):
+    from ..services.scheduler_service import log_app_event
+
     person = Person.query.get_or_404(person_id)
     settings = AppSettings.get_or_create()
 
@@ -1006,6 +1089,9 @@ def link_tmdb(person_id: int):
             }), 409
         flash(message, 'warning')
         return redirect(url_for('people.detail', person_id=existing_person.id))
+
+    previous_tmdb_person_id = person.tmdb_person_id
+    previous_manual_override = bool(person.tmdb_manual_override)
 
     try:
         person.tmdb_person_id = tmdb_person_id
@@ -1051,6 +1137,20 @@ def link_tmdb(person_id: int):
         db.session.commit()
         refresh_person_missing_titles(person, settings=settings)
 
+        log_app_event(
+            'info',
+            'tmdb',
+            f'TMDb link selected manually for "{person.name}".',
+            details=(
+                f'Previous TMDb: {previous_tmdb_person_id or "—"} | '
+                f'New TMDb: {person.tmdb_person_id or "—"} | '
+                f'Previous manual override: {"on" if previous_manual_override else "off"} | '
+                f'Current manual override: {"on" if person.tmdb_manual_override else "off"}'
+            ),
+            related_type='person',
+            related_id=person.id,
+        )
+
         success_message = f'TMDb link updated manually for "{person.name}".'
         if _wants_json_response():
             return jsonify({
@@ -1078,8 +1178,13 @@ def link_tmdb(person_id: int):
 
 @bp.post('/<int:person_id>/rematch-tmdb')
 def rematch_tmdb(person_id: int):
+    from ..services.scheduler_service import log_app_event
+
     person = Person.query.get_or_404(person_id)
     settings = AppSettings.get_or_create()
+
+    previous_tmdb_person_id = person.tmdb_person_id
+    previous_manual_override = bool(person.tmdb_manual_override)
 
     person.tmdb_person_id = None
     person.tmdb_manual_override = False
@@ -1088,6 +1193,19 @@ def rematch_tmdb(person_id: int):
         person.source_url = None
 
     db.session.commit()
+
+    log_app_event(
+        'info',
+        'tmdb',
+        f'TMDb link cleared for "{person.name}".',
+        details=(
+            f'Previous TMDb: {previous_tmdb_person_id or "—"} | '
+            f'Previous manual override: {"on" if previous_manual_override else "off"} | '
+            'Current TMDb: — | Current manual override: off'
+        ),
+        related_type='person',
+        related_id=person.id,
+    )
 
     candidates = []
     if settings.tmdb_api_key:
@@ -1413,6 +1531,117 @@ def _get_tmdb_candidates_for_person(person: Person, settings: AppSettings, *, li
     )
 
 
+def _tmdb_confidence_meta(score_value: int | None) -> tuple[str, str]:
+    score = int(score_value or -10_000)
+
+    if score >= 220:
+        return ('Very high', 'emerald')
+    if score >= 140:
+        return ('High', 'sky')
+    if score >= 90:
+        return ('Medium', 'amber')
+    if score >= 55:
+        return ('Low', 'orange')
+    return ('Very low', 'rose')
+
+
+def _decorate_tmdb_candidates_for_ui(tmdb_candidates: list[dict]) -> list[dict]:
+    if not tmdb_candidates:
+        return []
+
+    best_score = int(tmdb_candidates[0].get('match_score') or -10_000)
+    rows = []
+
+    for index, candidate in enumerate(tmdb_candidates):
+        row = dict(candidate)
+        score_value = int(candidate.get('match_score') or -10_000)
+        confidence_label, confidence_tone = _tmdb_confidence_meta(score_value)
+
+        row['rank'] = index + 1
+        row['confidence_label'] = confidence_label
+        row['confidence_tone'] = confidence_tone
+        row['score_delta_vs_best'] = 0 if index == 0 else (best_score - score_value)
+
+        rows.append(row)
+
+    return rows
+
+
+def _build_tmdb_match_review(person: Person, tmdb_match: dict | None, tmdb_candidates: list[dict]) -> dict:
+    best_candidate = tmdb_candidates[0] if tmdb_candidates else None
+    second_candidate = tmdb_candidates[1] if len(tmdb_candidates) > 1 else None
+
+    best_score = int(best_candidate.get('match_score') or -10_000) if best_candidate else None
+    second_score = int(second_candidate.get('match_score') or -10_000) if second_candidate else None
+    score_gap = (
+        best_score - second_score
+        if best_score is not None and second_score is not None
+        else None
+    )
+
+    reasons = []
+    status = 'needs_review'
+
+    if person.tmdb_person_id:
+        status = 'linked'
+
+        if person.tmdb_manual_override:
+            reasons.append(
+                'Current TMDb link was selected manually. Automatic matching is no longer deciding for this person.'
+            )
+        elif (tmdb_match or {}).get('id') == person.tmdb_person_id:
+            reasons.append(
+                'Current TMDb link passed the automatic matching thresholds.'
+            )
+        else:
+            reasons.append(
+                'Current TMDb link is stored on the person record.'
+            )
+    else:
+        if not best_candidate:
+            status = 'no_candidate'
+            reasons.append(
+                'TMDb returned no usable candidate for the current person name.'
+            )
+        else:
+            if best_score is not None and best_score < 55:
+                reasons.append(
+                    f'Best candidate score ({best_score}) stayed below the automatic selection threshold (55).'
+                )
+
+            if (
+                score_gap is not None
+                and not person.death_date
+                and best_score is not None
+                and best_score < 140
+                and score_gap < 8
+            ):
+                reasons.append(
+                    f'Best and second candidates are too close without a death date ({best_score} vs {second_score}, gap {score_gap}).'
+                )
+
+            if not reasons:
+                reasons.append(
+                    'No candidate was auto-selected, so manual confirmation is still recommended.'
+                )
+
+    best_confidence_label, best_confidence_tone = _tmdb_confidence_meta(best_score)
+
+    return {
+        'status': status,
+        'has_death_date': bool(person.death_date),
+        'best_candidate_name': (best_candidate or {}).get('name'),
+        'best_candidate_id': (best_candidate or {}).get('id'),
+        'best_score': best_score,
+        'best_confidence_label': best_confidence_label if best_candidate else None,
+        'best_confidence_tone': best_confidence_tone if best_candidate else None,
+        'second_score': second_score,
+        'score_gap': score_gap,
+        'candidate_count': len(tmdb_candidates),
+        'reasons': reasons,
+    }
+
+
 def _load_tmdb_context(person: Person, settings: AppSettings):
     tmdb_match = None
     tmdb_credits = {'cast': [], 'crew': []}
@@ -1568,9 +1797,33 @@ def detail(person_id: int):
         .get_or_404(person_id)
     )
     settings = AppSettings.get_or_create()
+    candidate_row = (
+        db.session.query(DetectionCandidate.popularity_score)
+        .filter(DetectionCandidate.slug == person.slug)
+        .first()
+    )
+
+    candidate_priority = int(candidate_row[0] or 0) if candidate_row and candidate_row[0] is not None else None
+    stored_web_priority = int(person.web_priority or 0)
+    effective_priority = int(person.manual_priority) if person.manual_priority is not None else (
+        candidate_priority if candidate_priority is not None else stored_web_priority
+    )
 
     tmdb_match = None
     tmdb_candidates = []
+    tmdb_review = {
+        'status': 'needs_review',
+        'has_death_date': bool(person.death_date),
+        'best_candidate_name': None,
+        'best_candidate_id': None,
+        'best_score': None,
+        'best_confidence_label': None,
+        'best_confidence_tone': None,
+        'second_score': None,
+        'score_gap': None,
+        'candidate_count': 0,
+        'reasons': [],
+    }
     tmdb_credits = {'cast': [], 'crew': []}
     person_photo_url = None
     missing_movies, missing_shows = load_person_missing_titles(person)
@@ -1630,7 +1883,11 @@ def detail(person_id: int):
             person_photo_url = _load_tmdb_person_photo(person, settings, tmdb_match=tmdb_match)
 
             if not person.tmdb_person_id:
-                tmdb_candidates = _get_tmdb_candidates_for_person(person, settings)
+                tmdb_candidates = _decorate_tmdb_candidates_for_ui(
+                    _get_tmdb_candidates_for_person(person, settings)
+                )
+
+            tmdb_review = _build_tmdb_match_review(person, tmdb_match, tmdb_candidates)
 
             if force_refresh_missing:
                 missing_movies, missing_shows = refresh_person_missing_titles(
@@ -1662,12 +1919,26 @@ def detail(person_id: int):
 
     duplicates = find_possible_duplicates(person)
 
+    matching_history = (
+        AppLog.query
+        .filter(
+            AppLog.related_type == 'person',
+            AppLog.related_id == person.id,
+            AppLog.source.in_(['tmdb', 'people']),
+        )
+        .order_by(AppLog.created_at.desc(), AppLog.id.desc())
+        .limit(8)
+        .all()
+    )
+
     return render_template(
         'person_detail.html',
         person=person,
         settings=settings,
+        effective_priority=effective_priority,
         tmdb_match=tmdb_match,
         tmdb_candidates=tmdb_candidates,
+        tmdb_review=tmdb_review,
         tmdb_credits=tmdb_credits,
         person_photo_url=person_photo_url,
         missing_movies=missing_movies,
@@ -1678,11 +1949,21 @@ def detail(person_id: int):
         movie_library_targets=movie_library_targets,
         show_library_targets=show_library_targets,
         duplicates=duplicates,
+        matching_history=matching_history,
     )
 
 @bp.post('/<int:person_id>/selection-settings')
 def selection_settings(person_id: int):
+    from ..services.scheduler_service import log_app_event
+
     person = Person.query.get_or_404(person_id)
+
+    previous_manual_priority = person.manual_priority
+    previous_is_pinned = bool(person.is_pinned)
+    previous_exclude_from_auto = bool(person.exclude_from_auto)
+    previous_force_publish = bool(person.force_publish)
+    previous_ignore_until = person.ignore_until
+    previous_selection_note = person.selection_note or ''
 
     manual_priority_raw = (request.form.get('manual_priority') or '').strip()
     ignore_days_raw = (request.form.get('ignore_days') or '').strip()
@@ -1702,6 +1983,46 @@ def selection_settings(person_id: int):
             person.ignore_until = None
 
     db.session.commit()
+
+    changes = []
+
+    if previous_manual_priority != person.manual_priority:
+        changes.append(
+            f'manual_priority: {previous_manual_priority if previous_manual_priority is not None else "—"} -> {person.manual_priority if person.manual_priority is not None else "—"}'
+        )
+
+    if previous_is_pinned != bool(person.is_pinned):
+        changes.append(
+            f'is_pinned: {"on" if previous_is_pinned else "off"} -> {"on" if person.is_pinned else "off"}'
+        )
+
+    if previous_exclude_from_auto != bool(person.exclude_from_auto):
+        changes.append(
+            f'exclude_from_auto: {"on" if previous_exclude_from_auto else "off"} -> {"on" if person.exclude_from_auto else "off"}'
+        )
+
+    if previous_force_publish != bool(person.force_publish):
+        changes.append(
+            f'force_publish: {"on" if previous_force_publish else "off"} -> {"on" if person.force_publish else "off"}'
+        )
+
+    if previous_ignore_until != person.ignore_until:
+        changes.append(
+            f'ignore_until: {previous_ignore_until or "—"} -> {person.ignore_until or "—"}'
+        )
+
+    if previous_selection_note != (person.selection_note or ''):
+        changes.append('selection_note updated')
+
+    log_app_event(
+        'info',
+        'people',
+        f'Selection settings updated for "{person.name}".',
+        details=' | '.join(changes) if changes else 'No effective change.',
+        related_type='person',
+        related_id=person.id,
+    )
+
     flash('Selection settings updated.', 'success')
     return redirect(url_for('people.detail', person_id=person.id))
 

@@ -190,7 +190,7 @@ def refresh_server_cache(server_id: int):
 
     if not libraries:
         flash('No enabled library to refresh for this server.', 'warning')
-        return redirect(url_for('servers.index'))
+        return redirect(url_for('servers.index', open_server=server.id))
 
     app_obj = current_app._get_current_object()
     job_id = f'refresh_server_cache_{server.id}_{int(datetime.utcnow().timestamp())}'
@@ -213,11 +213,11 @@ def refresh_server_cache(server_id: int):
     )
 
     flash(
-        f'Plex cache refresh started in background for "{server.name}". Reload the page in a moment to see the updated status.',
+        f'Plex cache refresh started in background for "{server.name}".',
         'success',
     )
 
-    return redirect(url_for('servers.index'))
+    return redirect(url_for('servers.index', open_server=server.id))
 
 @bp.post('/library/<int:target_id>/toggle')
 def toggle_library(target_id: int):

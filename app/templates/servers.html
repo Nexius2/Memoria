@@ -2,12 +2,6 @@
 {% from '_secret_fields.html' import secret_input_attrs %}
 {% block content %}
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-  <div
-    id="background-refresh-banner"
-    class="hidden xl:col-span-3 panel text-sm text-emerald-200/80"
-  >
-    Background refresh running… this page will auto-refresh for a short time.
-  </div>
   <div class="panel">
     <h2 class="text-xl font-semibold text-white mb-4">Add Plex server</h2>
     <form
@@ -28,25 +22,38 @@
         <input class="field" type="text" name="base_url" placeholder="http://plex:32400" required>
       </div>
 
-      <div>
-        <label class="field-label">Token *</label>
-        <div class="flex gap-2">
-          <input
-            id="plex-add-token-input"
-            class="field"
-            name="token"
-            {{ secret_input_attrs() }}
-            required
-          >
-          <button
-            type="button"
-            class="btn-secondary whitespace-nowrap"
-            data-secret-toggle="plex-add-token-input"
-          >
-            Show
-          </button>
+        <div>
+          <label class="field-label">Token *</label>
+          <div class="relative">
+            <input
+              id="plex-add-token-input"
+              class="field pr-28"
+              name="token"
+              {{ secret_input_attrs() }}
+              required
+            >
+            <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="text-xs text-emerald-200/70 hover:text-white"
+                data-secret-copy="plex-add-token-input"
+                title="Copier"
+                aria-label="Copier"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                class="text-emerald-200/70 hover:text-white"
+                data-secret-toggle="plex-add-token-input"
+                title="Afficher"
+                aria-label="Afficher"
+              >
+                👁
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
       <label class="inline-flex items-center gap-2 text-sm">
         <input type="checkbox" name="verify_ssl"> Verify SSL
@@ -78,14 +85,12 @@
               <button class="btn-secondary" type="submit">Discover libraries</button>
             </form>
 
-            <form
-              method="post"
-              action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}"
-              class="js-background-refresh-form"
-              data-refresh-scope="servers"
-            >
-              <button class="btn-secondary" type="submit">Refresh Plex cache</button>
-            </form>
+			<form
+			  method="post"
+			  action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}"
+			>
+			  <button class="btn-secondary" type="submit">Refresh Plex cache</button>
+			</form>
 
             <button
               type="button"
@@ -109,16 +114,18 @@
 			  <button class="btn-danger" type="submit">Delete</button>
 			</form>
 
-            <button
-              type="button"
-              class="btn-secondary server-toggle"
-              data-target="server-libraries-{{ server.id }}"
-              data-arrow="server-arrow-{{ server.id }}"
-              aria-expanded="false"
-              aria-controls="server-libraries-{{ server.id }}"
-            >
-              <span id="server-arrow-{{ server.id }}">▼</span>
-            </button>
+			<button
+			  type="button"
+			  class="btn-secondary server-toggle"
+			  data-target="server-libraries-{{ server.id }}"
+			  data-arrow="server-arrow-{{ server.id }}"
+			  aria-expanded="{% if request.args.get('open_server') == (server.id|string) %}true{% else %}false{% endif %}"
+			  aria-controls="server-libraries-{{ server.id }}"
+			>
+			  <span id="server-arrow-{{ server.id }}">
+				{% if request.args.get('open_server') == (server.id|string) %}▲{% else %}▼{% endif %}
+			  </span>
+			</button>
           </div>
         </div>
 
@@ -147,23 +154,35 @@
             </div>
 
             <div class="md:col-span-2">
-              <label class="field-label">Token *</label>
-              <div class="flex gap-2">
+              <label class="field-label">Token</label>
+              <div class="relative">
                 <input
                   id="plex-edit-token-input-{{ server.id }}"
-                  class="field"
+                  class="field pr-28"
                   name="token"
                   value="{{ server.token }}"
                   {{ secret_input_attrs() }}
-                  required
                 >
-                <button
-                  type="button"
-                  class="btn-secondary whitespace-nowrap"
-                  data-secret-toggle="plex-edit-token-input-{{ server.id }}"
-                >
-                  Show
-                </button>
+                <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="text-xs text-emerald-200/70 hover:text-white"
+                    data-secret-copy="plex-edit-token-input-{{ server.id }}"
+                    title="Copier"
+                    aria-label="Copier"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    class="text-emerald-200/70 hover:text-white"
+                    data-secret-toggle="plex-edit-token-input-{{ server.id }}"
+                    title="Afficher"
+                    aria-label="Afficher"
+                  >
+                    👁
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -183,10 +202,10 @@
           </form>
         </div>
 
-        <div
-          id="server-libraries-{{ server.id }}"
-          class="hidden mt-4 space-y-3"
-        >
+			<div
+			  id="server-libraries-{{ server.id }}"
+			  class="{% if request.args.get('open_server') == (server.id|string) %}mt-4 space-y-3{% else %}hidden mt-4 space-y-3{% endif %}"
+			>
           {% for library in server.libraries %}
             <form
               method="post"
@@ -280,33 +299,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const forms = document.querySelectorAll('.library-autosave-form');
-  const backgroundForms = document.querySelectorAll('.js-background-refresh-form');
-  const refreshBanner = document.getElementById('background-refresh-banner');
-  const refreshStorageKey = 'memoriaServersBackgroundRefresh';
-
-  const startAutoRefresh = () => {
-    const expiresAt = Date.now() + 45000;
-    localStorage.setItem(refreshStorageKey, String(expiresAt));
-  };
-
-  const resumeAutoRefreshIfNeeded = () => {
-    const raw = localStorage.getItem(refreshStorageKey);
-    if (!raw) return;
-
-    const expiresAt = Number(raw);
-    if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
-      localStorage.removeItem(refreshStorageKey);
-      return;
-    }
-
-    if (refreshBanner) {
-      refreshBanner.classList.remove('hidden');
-    }
-
-    setTimeout(() => {
-      window.location.reload();
-    }, 4000);
-  };
 
   forms.forEach((form) => {
     let busy = false;
@@ -341,12 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  backgroundForms.forEach((form) => {
-    form.addEventListener('submit', () => {
-      startAutoRefresh();
-    });
-  });
-
   document.querySelectorAll('.server-toggle').forEach((button) => {
     button.addEventListener('click', () => {
       const targetId = button.getAttribute('data-target');
@@ -370,8 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-
-  resumeAutoRefreshIfNeeded();
 });
 </script>
 {% endblock %}

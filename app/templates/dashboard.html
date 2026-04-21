@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-4 mb-6">
   <div class="panel">
     <div class="label">Active events</div>
     <div class="value">{{ dashboard_overview.active_events_count }}</div>
@@ -24,6 +24,42 @@
     <div class="value">{{ dashboard_overview.running_jobs_count }}</div>
     <div class="mt-2 text-sm text-emerald-200/70">Detection / sync / expire</div>
   </div>
+
+  <div class="panel">
+    <div class="label">Missing movies</div>
+    <div class="value">{{ dashboard_overview.missing_movies_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Total missing movie titles</div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Missing shows</div>
+    <div class="value">{{ dashboard_overview.missing_shows_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Total missing show titles</div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Arr-ready missing</div>
+    <div class="value">{{ dashboard_overview.arr_ready_missing_titles_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">Missing titles that can be sent now</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <a href="{{ url_for('people.index', status='excluded', source='all', missing='all', sort='priority_desc') }}" class="panel hover:bg-white/5 transition">
+    <div class="label">Excluded from auto</div>
+    <div class="value">{{ dashboard_overview.excluded_people_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">
+      People manually excluded from automatic selection
+    </div>
+  </a>
+
+  <a href="{{ url_for('people.index', status='ignored', source='all', missing='all', sort='priority_desc') }}" class="panel hover:bg-white/5 transition">
+    <div class="label">Ignored for now</div>
+    <div class="value">{{ dashboard_overview.ignored_people_count }}</div>
+    <div class="mt-2 text-sm text-emerald-200/70">
+      People currently ignored until a future date
+    </div>
+  </a>
 </div>
 
 <div class="dashboard-advanced-toolbar mb-6">
@@ -199,6 +235,173 @@
     {% else %}
       <div class="text-sm text-emerald-200/60">
         No obvious anomaly on active events.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel mb-6">
+  <div class="flex items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 class="text-xl font-semibold text-white">People with most missing titles</h2>
+      <p class="text-sm text-emerald-200/70">
+        Quick shortcut to the people currently generating the biggest missing titles backlog.
+      </p>
+    </div>
+    <a class="btn-secondary" href="{{ url_for('arr.missing_titles', arr_ready='ready') }}">Open missing titles</a>
+  </div>
+
+  {% if dashboard_overview.people_with_most_missing_titles %}
+    <div class="space-y-3">
+      {% for row in dashboard_overview.people_with_most_missing_titles %}
+        <div class="rounded-2xl border border-emerald-400/10 bg-black/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <a class="text-white font-medium hover:text-emerald-100" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+              {{ row.person_name }}
+            </a>
+            <div class="mt-1 text-xs text-emerald-200/70">
+              {{ row.movie_count }} movie{{ 's' if row.movie_count != 1 else '' }} · {{ row.show_count }} show{{ 's' if row.show_count != 1 else '' }}
+              {% if row.arr_ready_total %}
+                · {{ row.arr_ready_total }} Arr-ready
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-tag inline-tag--emerald">
+              Total {{ row.total_missing }}
+            </span>
+
+            {% if row.missing_titles_status == 'error' %}
+              <span class="inline-tag inline-tag--rose">Scan error</span>
+            {% elif row.missing_titles_status == 'pending' %}
+              <span class="inline-tag inline-tag--orange">Scan pending</span>
+            {% elif row.missing_titles_status == 'disabled' %}
+              <span class="inline-tag inline-tag--slate">Scan disabled</span>
+            {% endif %}
+
+            <a class="btn-secondary text-xs" href="{{ url_for('arr.missing_titles', search=row.person_name) }}">See titles</a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-sm text-emerald-200/60">
+      No missing title backlog detected yet.
+    </div>
+  {% endif %}
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+  <div class="panel">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">Candidates needing manual review</h2>
+        <p class="text-sm text-emerald-200/70">
+          People without a selected TMDb match. These usually need a manual check.
+        </p>
+      </div>
+      <a class="btn-secondary" href="{{ url_for('people.review') }}">
+        Open review queue
+      </a>
+    </div>
+
+    {% if dashboard_overview.manual_review_people %}
+      <div class="space-y-3">
+        {% for row in dashboard_overview.manual_review_people %}
+          <div class="rounded-2xl border border-sky-400/15 bg-sky-500/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <a class="text-white font-medium hover:text-sky-100" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+                {{ row.person_name }}
+              </a>
+              <div class="mt-1 text-xs text-sky-100/80">
+                Source: {{ row.source }}
+                {% if row.death_date %}
+                  · Death: {{ row.death_date }}
+                {% endif %}
+                · Priority {{ row.effective_priority }}
+              </div>
+              <div class="mt-1 text-xs text-sky-100/70">
+                {{ row.movie_count }} movie{{ 's' if row.movie_count != 1 else '' }} · {{ row.show_count }} show{{ 's' if row.show_count != 1 else '' }}
+                {% if row.total_missing %}
+                  · {{ row.total_missing }} missing
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-tag inline-tag--sky">
+                TMDb missing
+              </span>
+              <a class="btn-secondary text-xs" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+                Review
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-sm text-emerald-200/60">
+        No person currently needs TMDb manual review.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-white">People with failed scans</h2>
+        <p class="text-sm text-emerald-200/70">
+          Missing titles scans that ended with an error.
+        </p>
+      </div>
+      <a class="btn-secondary" href="{{ url_for('people.review') }}">Open review queue</a>
+    </div>
+
+    {% if dashboard_overview.failed_scan_people %}
+      <div class="space-y-3">
+        {% for row in dashboard_overview.failed_scan_people %}
+          <div class="rounded-2xl border border-rose-400/15 bg-rose-500/10 px-4 py-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <a class="text-white font-medium hover:text-rose-100" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+                  {{ row.person_name }}
+                </a>
+                <div class="mt-1 text-xs text-rose-100/80">
+                  Source: {{ row.source }} · Priority {{ row.effective_priority }}
+                  {% if row.missing_titles_scanned_at %}
+                    · Last scan: {{ row.missing_titles_scanned_at.strftime('%Y-%m-%d %H:%M') }}
+                  {% endif %}
+                </div>
+                <div class="mt-1 text-xs text-rose-100/70">
+                  {{ row.movie_count }} movie{{ 's' if row.movie_count != 1 else '' }} · {{ row.show_count }} show{{ 's' if row.show_count != 1 else '' }}
+                  {% if row.total_missing %}
+                    · {{ row.total_missing }} missing
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-tag inline-tag--rose">
+                  Scan error
+                </span>
+                <a class="btn-secondary text-xs" href="{{ url_for('people.detail', person_id=row.person_id) }}">
+                  Open
+                </a>
+              </div>
+            </div>
+
+            {% if row.missing_titles_error %}
+              <div class="mt-3 rounded-xl border border-rose-300/15 bg-black/10 px-3 py-2 text-xs text-rose-100/85 break-words">
+                {{ row.missing_titles_error }}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-sm text-emerald-200/60">
+        No failed missing titles scan detected.
       </div>
     {% endif %}
   </div>

@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import date, timedelta
 import csv
 import io
+import json
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, Response
 from sqlalchemy.orm import joinedload
@@ -18,6 +19,9 @@ from ..models import (
     TaskRun,
     AppLog,
     Person,
+    ArrServer,
+    LibraryTarget,
+    PlexServer,
     create_or_retrigger_event,
 )
 from ..services.scheduler_service import (
@@ -310,7 +314,7 @@ def _normalize_dashboard_country(value: str | None) -> str | None:
     return normalized
 
 
-def _build_dashboard_overview() -> dict:
+def _build_dashboard_overview(settings: AppSettings) -> dict:
     all_events = (
         TributeEvent.query
         .options(
@@ -383,6 +387,155 @@ def _build_dashboard_overview() -> dict:
         'all': len(all_events),
     }
 
+    movie_arr_ready = (
+        db.session.query(LibraryTarget.id)
+        .join(PlexServer, LibraryTarget.plex_server_id == PlexServer.id)
+        .join(ArrServer, LibraryTarget.arr_server_id == ArrServer.id)
+        .filter(
+            LibraryTarget.enabled.is_(True),
+            PlexServer.enabled.is_(True),
+            LibraryTarget.arr_server_id.isnot(None),
+            LibraryTarget.media_type == 'movie',
+            ArrServer.kind == 'radarr',
+            ArrServer.enabled.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+    show_arr_ready = (
+        db.session.query(LibraryTarget.id)
+        .join(PlexServer, LibraryTarget.plex_server_id == PlexServer.id)
+        .join(ArrServer, LibraryTarget.arr_server_id == ArrServer.id)
+        .filter(
+            LibraryTarget.enabled.is_(True),
+            PlexServer.enabled.is_(True),
+            LibraryTarget.arr_server_id.isnot(None),
+            LibraryTarget.media_type == 'show',
+            ArrServer.kind == 'sonarr',
+            ArrServer.enabled.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+    missing_movies_count = 0
+    missing_shows_count = 0
+    arr_ready_missing_titles_count = 0
+    people_with_most_missing_titles = []
+    manual_review_people = []
+    failed_scan_people = []
+    excluded_people_count = 0
+    ignored_people_count = 0
+
+    all_people = Person.query.order_by(Person.name.asc()).all()
+
+    for person in all_people:
+        try:
+            missing_movies = json.loads(person.missing_titles_movies_json or '[]')
+        except Exception:
+            missing_movies = []
+
+        try:
+            missing_shows = json.loads(person.missing_titles_shows_json or '[]')
+        except Exception:
+            missing_shows = []
+
+        if not isinstance(missing_movies, list):
+            missing_movies = []
+
+        if not isinstance(missing_shows, list):
+            missing_shows = []
+
+        movie_count = len(missing_movies)
+        show_count = len(missing_shows)
+        total_missing = movie_count + show_count
+        arr_ready_total = (movie_count if movie_arr_ready else 0) + (show_count if show_arr_ready else 0)
+
+        missing_movies_count += movie_count
+        missing_shows_count += show_count
+        arr_ready_missing_titles_count += arr_ready_total
+
+        effective_priority = (
+            int(person.manual_priority)
+            if person.manual_priority is not None
+            else int(person.web_priority or 0)
+        )
+
+        missing_titles_status = person.missing_titles_status or 'pending'
+
+        if person.exclude_from_auto:
+            excluded_people_count += 1
+
+        if person.is_ignored_now:
+            ignored_people_count += 1
+
+        if total_missing > 0:
+            people_with_most_missing_titles.append({
+                'person_id': person.id,
+                'person_name': person.name,
+                'total_missing': total_missing,
+                'movie_count': movie_count,
+                'show_count': show_count,
+                'arr_ready_total': arr_ready_total,
+                'missing_titles_status': missing_titles_status,
+            })
+
+        if settings.tmdb_api_key and not person.tmdb_person_id:
+            manual_review_people.append({
+                'person_id': person.id,
+                'person_name': person.name,
+                'source': person.source or 'manual',
+                'effective_priority': effective_priority,
+                'total_missing': total_missing,
+                'movie_count': movie_count,
+                'show_count': show_count,
+                'death_date': person.death_date,
+                'tmdb_manual_override': bool(person.tmdb_manual_override),
+            })
+
+        if missing_titles_status == 'error':
+            failed_scan_people.append({
+                'person_id': person.id,
+                'person_name': person.name,
+                'source': person.source or 'manual',
+                'effective_priority': effective_priority,
+                'movie_count': movie_count,
+                'show_count': show_count,
+                'total_missing': total_missing,
+                'missing_titles_error': (person.missing_titles_error or '').strip(),
+                'missing_titles_scanned_at': person.missing_titles_scanned_at,
+            })
+
+    people_with_most_missing_titles.sort(
+        key=lambda row: (
+            row['total_missing'],
+            row['arr_ready_total'],
+            row['person_name'].lower(),
+        ),
+        reverse=True,
+    )
+
+    manual_review_people.sort(
+        key=lambda row: (
+            row['effective_priority'],
+            row['total_missing'],
+            row['death_date'] or date.min,
+            row['person_name'].lower(),
+        ),
+        reverse=True,
+    )
+
+    failed_scan_people.sort(
+        key=lambda row: (
+            row['total_missing'],
+            row['effective_priority'],
+            row['missing_titles_scanned_at'] or row['person_id'],
+            row['person_name'].lower(),
+        ),
+        reverse=True,
+    )
+
     return {
         'active_events_count': len(live_active_events),
         'expiring_soon_count': len(expiring_soon_events),
@@ -394,6 +547,16 @@ def _build_dashboard_overview() -> dict:
         'status_counts': status_counts,
         'problematic_events': problematic_events[:6],
         'problematic_events_count': len(problematic_events),
+        'missing_movies_count': missing_movies_count,
+        'missing_shows_count': missing_shows_count,
+        'arr_ready_missing_titles_count': arr_ready_missing_titles_count,
+        'people_with_most_missing_titles': people_with_most_missing_titles[:5],
+        'manual_review_people': manual_review_people[:5],
+        'manual_review_people_count': len(manual_review_people),
+        'failed_scan_people': failed_scan_people[:5],
+        'failed_scan_people_count': len(failed_scan_people),
+        'excluded_people_count': excluded_people_count,
+        'ignored_people_count': ignored_people_count,
     }
 
 def _sort_dashboard_events(events: list[TributeEvent], sort_by: str) -> list[TributeEvent]:
@@ -471,7 +634,7 @@ def dashboard():
     recover_stale_detection_runs()
     recover_stale_task_runs()
 
-    dashboard_overview = _build_dashboard_overview()
+    dashboard_overview = _build_dashboard_overview(settings)
 
     if view == 'soon':
         events = [

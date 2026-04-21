@@ -62,34 +62,49 @@
         >
       </div>
 
-      <div>
-        <label class="field-label">API key</label>
-        <div class="flex gap-2">
-          <input
-            id="arr-add-api-key-input"
-            class="field"
-            name="api_key"
-            value="{{ form.get('api_key', '') }}"
-            placeholder="xxxxxxxxxxxxxxxx"
-            {{ secret_input_attrs() }}
-            required
-          >
-          <button
-            type="button"
-            class="btn-secondary whitespace-nowrap"
-            data-secret-toggle="arr-add-api-key-input"
-          >
-            Show
-          </button>
-          <button
-            type="submit"
-            formaction="{{ url_for('arr.test_fill') }}"
-            class="btn-secondary whitespace-nowrap"
-          >
-            Test &amp; Fill
-          </button>
+        <div>
+          <label class="field-label">API key</label>
+          <div class="flex gap-2 items-center">
+            <div class="relative flex-1">
+              <input
+                id="arr-add-api-key-input"
+                class="field pr-28"
+                name="api_key"
+                value="{{ form.get('api_key', '') }}"
+                placeholder="xxxxxxxxxxxxxxxx"
+                {{ secret_input_attrs() }}
+                required
+              >
+              <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="text-xs text-emerald-200/70 hover:text-white"
+                  data-secret-copy="arr-add-api-key-input"
+                  title="Copier"
+                  aria-label="Copier"
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  class="text-emerald-200/70 hover:text-white"
+                  data-secret-toggle="arr-add-api-key-input"
+                  title="Afficher"
+                  aria-label="Afficher"
+                >
+                  👁
+                </button>
+              </div>
+            </div>
+            <button
+              type="submit"
+              formaction="{{ url_for('arr.test_fill') }}"
+              class="btn-secondary whitespace-nowrap"
+            >
+              Test &amp; Fill
+            </button>
+          </div>
         </div>
-      </div>
 
       {% if discovery %}
         <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4 space-y-3">
@@ -365,22 +380,35 @@
 
                 <div>
                   <label class="field-label">API key</label>
-                  <div class="flex gap-2">
+                  <div class="relative">
                     <input
                       id="arr-edit-api-key-input-{{ arr.id }}"
-                      class="field"
+                      class="field pr-28"
                       name="api_key"
                       value="{{ arr.api_key }}"
                       {{ secret_input_attrs() }}
                       required
                     >
-                    <button
-                      type="button"
-                      class="btn-secondary whitespace-nowrap"
-                      data-secret-toggle="arr-edit-api-key-input-{{ arr.id }}"
-                    >
-                      Show
-                    </button>
+                    <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        class="text-xs text-emerald-200/70 hover:text-white"
+                        data-secret-copy="arr-edit-api-key-input-{{ arr.id }}"
+                        title="Copier"
+                        aria-label="Copier"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        type="button"
+                        class="text-emerald-200/70 hover:text-white"
+                        data-secret-toggle="arr-edit-api-key-input-{{ arr.id }}"
+                        title="Afficher"
+                        aria-label="Afficher"
+                      >
+                        👁
+                      </button>
+                    </div>
                   </div>
                 </div>
 

@@ -62,29 +62,31 @@ This file now focuses on what is still missing or worth improving, instead of ke
   - [x] Refresh missing titles directly from row
   - [x] Pin / exclude directly from row where useful
 
+- [x] Fix Plex library cache sorting when titles contain mixed year values (None / int)
+
 ---
 
 ## Matching / TMDb improvements
 
-- [ ] Improve fallback matching when name is approximate
-- [ ] Better homonym handling
-- [ ] Better confidence explanation in UI
-- [ ] Show why automatic TMDb match was rejected
-- [ ] Manual override history / flag visibility improvements
+- [x] Improve fallback matching when name is approximate
+- [x] Better homonym handling
+- [x] Better confidence explanation in UI
+- [x] Show why automatic TMDb match was rejected
+- [x] Manual override history / flag visibility improvements
 
 ---
 
 ## Dashboard improvements
 
 - [ ] Missing titles widgets on dashboard
-  - [ ] total missing movies
-  - [ ] total missing shows
-  - [ ] Arr-ready missing titles
-  - [ ] people with most missing titles
+  - [x] total missing movies
+  - [x] total missing shows
+  - [x] Arr-ready missing titles
+  - [x] people with most missing titles
 
-- [ ] Surface candidates needing manual review
-- [ ] Surface people with failed scans
-- [ ] Surface excluded / ignored counts if useful
+- [x] Surface candidates needing manual review
+- [x] Surface people with failed scans
+- [x] Surface excluded / ignored counts if useful
 
 ---
 
@@ -109,15 +111,15 @@ This file now focuses on what is still missing or worth improving, instead of ke
 
 ## Settings / security
 
-- [ ] Hide / mask Plex API keys in UI
-- [ ] Hide / mask Arr API keys in UI
-- [ ] Add explicit reveal / copy action for secret fields if needed
+- [x] Hide / mask Plex API keys in UI
+- [x] Hide / mask Arr API keys in UI
+- [x] Add explicit reveal / copy action for secret fields if needed
 
 ---
 
 ## Nice to have
 
-- [ ] Global review queue for people needing manual attention
+- [x] Global review queue for people needing manual attention
 - [ ] Better audit trail for actions taken on people
 - [ ] More helpful empty states in pages with no data
 - [ ] Optional export of people / events / missing titles

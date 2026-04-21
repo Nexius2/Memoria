@@ -55,15 +55,22 @@
     {% endif %}
 
     <div class="flex flex-col gap-4 mb-4">
-	<div class="flex items-center justify-between gap-4">
-	  <h2 class="text-xl font-semibold text-white section-title-with-icon">
-	    <span class="section-title-icon">◉</span>
-	    <span>Known people</span>
-	  </h2>
-	  <div class="text-xs text-emerald-200/60">
-		{{ page_rows_start }}–{{ page_rows_end }} / {{ total_people_count }} shown
-	  </div>
-	</div>
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold text-white section-title-with-icon">
+          <span class="section-title-icon">◉</span>
+          <span>Known people</span>
+        </h2>
+
+        <a class="btn-secondary" href="{{ url_for('people.review') }}">
+          Review queue
+        </a>
+      </div>
+
+      <div class="text-xs text-emerald-200/60">
+        {{ page_rows_start }}–{{ page_rows_end }} / {{ total_people_count }} shown
+      </div>
+    </div>
 
       <form
         id="people-filters-form"
@@ -102,6 +109,8 @@
                 <option value="active_event" {% if status_filter == 'active_event' %}selected{% endif %}>Active event</option>
                 <option value="candidate" {% if status_filter == 'candidate' %}selected{% endif %}>Candidate</option>
                 <option value="known_person" {% if status_filter == 'known_person' %}selected{% endif %}>Known person</option>
+                <option value="excluded" {% if status_filter == 'excluded' %}selected{% endif %}>Excluded from auto</option>
+                <option value="ignored" {% if status_filter == 'ignored' %}selected{% endif %}>Ignored for now</option>
               </select>
             </div>
 
@@ -249,24 +258,9 @@
                       <span class="inline-tag inline-tag--orange">Manual {{ row.manual_priority }}</span>
                     {% endif %}
 
-                    <span class="inline-tag inline-tag--cyan">
-                      Web {{ row.candidate_priority if row.candidate_priority is not none else row.stored_web_priority }}
-                    </span>
-
                     <span class="inline-tag inline-tag--emerald">
-                      Effective {{ row.effective_priority }}
+                      Score {{ row.effective_priority }} / {{ settings.min_people_priority_display }}
                     </span>
-                  </div>
-
-                  <div class="list-cell-subtitle mt-2">
-                    Threshold {{ settings.min_people_priority_display }}
-                    {% if row.manual_priority is not none %}
-                      · manual override active
-                    {% elif row.candidate_priority is not none %}
-                      · using current web candidate score
-                    {% else %}
-                      · using stored web score
-                    {% endif %}
                   </div>
 
                   <div class="row-actions mt-3">

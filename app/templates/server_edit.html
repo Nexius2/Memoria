@@ -24,25 +24,38 @@
         <input class="field" type="text" name="base_url" placeholder="http://plex:32400" required>
       </div>
 
-      <div>
-        <label class="field-label">Token *</label>
-        <div class="flex gap-2">
-          <input
-            id="plex-add-token-input"
-            class="field"
-            name="token"
-            {{ secret_input_attrs() }}
-            required
-          >
-          <button
-            type="button"
-            class="btn-secondary whitespace-nowrap"
-            data-secret-toggle="plex-add-token-input"
-          >
-            Show
-          </button>
+        <div>
+          <label class="field-label">Token *</label>
+          <div class="relative">
+            <input
+              id="plex-add-token-input"
+              class="field pr-28"
+              name="token"
+              {{ secret_input_attrs() }}
+              required
+            >
+            <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="text-xs text-emerald-200/70 hover:text-white"
+                data-secret-copy="plex-add-token-input"
+                title="Copier"
+                aria-label="Copier"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                class="text-emerald-200/70 hover:text-white"
+                data-secret-toggle="plex-add-token-input"
+                title="Afficher"
+                aria-label="Afficher"
+              >
+                👁
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
       <label class="inline-flex items-center gap-2 text-sm">
         <input type="checkbox" name="verify_ssl"> Verify SSL

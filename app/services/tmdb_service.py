@@ -38,6 +38,52 @@ class TmdbService:
             return []
         return [token for token in normalized.split(' ') if token]
 
+    def _strip_name_particles(self, tokens: list[str]) -> list[str]:
+        particles = {
+            'de', 'del', 'della', 'di', 'du', 'des',
+            'la', 'le', 'les',
+            'van', 'von', 'der', 'den',
+            'da', 'dos', 'das',
+            'el', 'al', 'bin', 'ibn',
+        }
+        return [token for token in tokens if token not in particles]
+
+    def _build_name_match_variants(self, value: str | None) -> list[str]:
+        variants: list[str] = []
+
+        def add(raw: str | None):
+            normalized = self._normalize_name(raw)
+            if normalized and normalized not in variants:
+                variants.append(normalized)
+
+        original = (value or '').strip()
+        tokens = self._tokenize_name(original)
+        stripped_tokens = self._strip_name_particles(tokens)
+
+        add(original)
+
+        if tokens:
+            add(' '.join(tokens))
+            add(''.join(tokens))
+
+        if len(tokens) >= 2:
+            add(f'{tokens[0]} {tokens[-1]}')
+            add(f'{tokens[-1]} {tokens[0]}')
+
+        if len(tokens) >= 3:
+            add(f'{tokens[0]} {" ".join(tokens[1:])}')
+            add(f'{" ".join(tokens[:-1])} {tokens[-1]}')
+
+        if stripped_tokens and stripped_tokens != tokens:
+            add(' '.join(stripped_tokens))
+            add(''.join(stripped_tokens))
+
+            if len(stripped_tokens) >= 2:
+                add(f'{stripped_tokens[0]} {stripped_tokens[-1]}')
+                add(f'{stripped_tokens[-1]} {stripped_tokens[0]}')
+
+        return variants
+
     def _similarity_ratio(self, left: str, right: str) -> float:
         if not left or not right:
             return 0.0
@@ -69,12 +115,14 @@ class TmdbService:
         variants: list[str] = []
 
         def add(value: str | None):
-            value = (value or '').strip()
+            value = re.sub(r'\s+', ' ', (value or '').strip())
             if value and value not in variants:
                 variants.append(value)
 
         original = (name or '').strip()
         normalized = self._normalize_name(original)
+        tokens = self._tokenize_name(original)
+        stripped_tokens = self._strip_name_particles(tokens)
 
         add(original)
         add(re.sub(r'\([^)]*\)', ' ', original))
@@ -83,69 +131,104 @@ class TmdbService:
         add(re.sub(r'[^A-Za-z0-9À-ÿ ]+', ' ', original))
         add(normalized)
 
-        tokens = self._tokenize_name(original)
+        for variant in self._build_name_match_variants(original):
+            add(variant)
+
         if len(tokens) >= 2:
-            add(' '.join(tokens))
             add(' '.join(reversed(tokens)))
+            add(f'{tokens[0]} {tokens[-1]}')
+            add(f'{tokens[-1]} {tokens[0]}')
 
             if len(tokens) > 2:
                 add(' '.join(tokens[:2]))
                 add(' '.join(tokens[-2:]))
 
-        cleaned_variants = []
-        for variant in variants:
-            cleaned = re.sub(r'\s+', ' ', variant).strip()
-            if cleaned and cleaned not in cleaned_variants:
-                cleaned_variants.append(cleaned)
+        if stripped_tokens and stripped_tokens != tokens:
+            add(' '.join(stripped_tokens))
 
-        return cleaned_variants[:8]
+            if len(stripped_tokens) >= 2:
+                add(f'{stripped_tokens[0]} {stripped_tokens[-1]}')
+                add(f'{stripped_tokens[-1]} {stripped_tokens[0]}')
+
+        return variants[:12]
 
     def _score_name_against_candidate_name(self, query_name: str, candidate_name: str) -> int:
-        normalized_query = self._normalize_name(query_name)
-        normalized_candidate = self._normalize_name(candidate_name)
+        query_variants = self._build_name_match_variants(query_name)
+        candidate_variants = self._build_name_match_variants(candidate_name)
 
-        if not normalized_query or not normalized_candidate:
+        if not query_variants or not candidate_variants:
             return -10_000
 
-        score = 0
+        best_score = -10_000
 
-        if normalized_candidate == normalized_query:
-            score += 260
-        elif normalized_candidate.startswith(normalized_query):
-            score += 160
-        elif normalized_query in normalized_candidate:
-            score += 130
-        elif normalized_candidate in normalized_query:
-            score += 90
+        for normalized_query in query_variants:
+            for normalized_candidate in candidate_variants:
+                score = 0
 
-        query_tokens = set(self._tokenize_name(query_name))
-        candidate_tokens = set(self._tokenize_name(candidate_name))
+                if normalized_candidate == normalized_query:
+                    score += 260
+                elif normalized_candidate.startswith(normalized_query):
+                    score += 160
+                elif normalized_query in normalized_candidate:
+                    score += 130
+                elif normalized_candidate in normalized_query:
+                    score += 90
 
-        if query_tokens and candidate_tokens:
-            common_tokens = query_tokens & candidate_tokens
-            score += len(common_tokens) * 22
+                query_tokens = set(self._tokenize_name(normalized_query))
+                candidate_tokens = set(self._tokenize_name(normalized_candidate))
 
-            if query_tokens == candidate_tokens:
-                score += 80
-            elif common_tokens:
-                coverage = len(common_tokens) / max(len(query_tokens), 1)
-                score += int(coverage * 55)
+                if query_tokens and candidate_tokens:
+                    common_tokens = query_tokens & candidate_tokens
+                    score += len(common_tokens) * 22
 
-                extra_tokens = candidate_tokens - query_tokens
-                if extra_tokens:
-                    score -= min(len(extra_tokens) * 8, 24)
-            else:
-                score -= 40
+                    if query_tokens == candidate_tokens:
+                        score += 80
+                    elif common_tokens:
+                        coverage = len(common_tokens) / max(len(query_tokens), 1)
+                        score += int(coverage * 55)
 
-        similarity = self._similarity_ratio(normalized_query, normalized_candidate)
-        score += int(similarity * 120)
+                        extra_tokens = candidate_tokens - query_tokens
+                        if extra_tokens:
+                            score -= min(len(extra_tokens) * 8, 24)
+                    else:
+                        score -= 40
 
-        if similarity < 0.45:
-            score -= 80
-        elif similarity < 0.60:
-            score -= 30
 
-        return score
+
+                    query_token_list = self._tokenize_name(normalized_query)
+                    candidate_token_list = self._tokenize_name(normalized_candidate)
+
+                    if len(query_token_list) >= 2 and len(candidate_token_list) >= 2:
+                        if query_token_list[-1] == candidate_token_list[-1]:
+                            score += 45
+
+                        if query_token_list[0] == candidate_token_list[0]:
+                            score += 18
+
+                        if (
+                            query_token_list[0][:1] == candidate_token_list[0][:1]
+                            and query_token_list[-1] == candidate_token_list[-1]
+                        ):
+                            score += 12
+
+                        if (
+                            query_token_list[0] == candidate_token_list[-1]
+                            and query_token_list[-1] == candidate_token_list[0]
+                        ):
+                            score += 10
+
+                similarity = self._similarity_ratio(normalized_query, normalized_candidate)
+                score += int(similarity * 120)
+
+                if similarity < 0.45:
+                    score -= 80
+                elif similarity < 0.60:
+                    score -= 30
+
+                if score > best_score:
+                    best_score = score
+
+        return best_score
 
     def _score_person_match(
         self,
@@ -177,11 +260,21 @@ class TmdbService:
             or ''
         ).strip()
 
-        if known_for_department in {'Acting', 'Directing', 'Writing', 'Production', 'Creator'}:
+        if known_for_department == 'Acting':
+            score += 35
+        elif known_for_department in {'Directing', 'Writing', 'Production', 'Creator'}:
             score += 10
+        elif known_for_department:
+            score -= 15
 
         popularity = float(candidate.get('popularity') or details.get('popularity') or 0.0)
-        score += min(int(popularity), 25)
+
+        if popularity > 20:
+            score += 25
+        elif popularity > 5:
+            score += 10
+        elif popularity < 1:
+            score -= 30
 
         expected_death_date = self._extract_date(death_date)
         candidate_death_date = self._extract_date(details.get('deathday'))
@@ -199,11 +292,27 @@ class TmdbService:
                         and candidate_death_year is not None
                         and candidate_death_year == expected_death_year
                     ):
-                        score += 140
+                        score += 120
                     else:
                         score -= 260
             else:
-                score -= 30
+                score -= 40
+
+        known_for_items = candidate.get('known_for') or details.get('known_for') or []
+        query_tokens = set(self._tokenize_name(query_name))
+
+        if query_tokens and isinstance(known_for_items, list):
+            for item in known_for_items[:3]:
+                title = (
+                    item.get('title')
+                    or item.get('name')
+                    or ''
+                )
+                title_tokens = set(self._tokenize_name(title))
+
+                if title_tokens and (query_tokens & title_tokens):
+                    score += 15
+                    break
 
         return (score, popularity)
 

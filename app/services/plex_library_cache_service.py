@@ -54,8 +54,13 @@ def refresh_library_title_cache(target: LibraryTarget) -> tuple[set[tuple[str, i
 
     keys_with_year, keys_without_year = plex.list_title_keys(target.section_name)
 
+    sorted_keys_with_year = sorted(
+        keys_with_year,
+        key=lambda item: (item[0], item[1] is None, item[1] if item[1] is not None else 0),
+    )
+
     payload = {
-        'keys_with_year': [[title, year] for title, year in sorted(keys_with_year)],
+        'keys_with_year': [[title, year] for title, year in sorted_keys_with_year],
         'keys_without_year': sorted(keys_without_year),
     }
 

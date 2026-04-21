@@ -59,7 +59,7 @@
           </a>
 
           <a
-            class="nav-tab {{ 'is-active' if current_endpoint == 'people.index' or current_endpoint == 'people.detail' else '' }}"
+            class="nav-tab {{ 'is-active' if current_endpoint == 'people.index' or current_endpoint == 'people.detail' or current_endpoint == 'people.review' else '' }}"
             href="{{ url_for('people.index') }}"
           >
             <span>People</span>
@@ -211,23 +211,75 @@
         const setMasked = (masked) => {
           if (masked) {
             input.setAttribute('data-secret-masked', '1');
+            button.setAttribute('title', 'Afficher');
+            button.setAttribute('aria-label', 'Afficher');
+            button.textContent = '👁';
           } else {
             input.removeAttribute('data-secret-masked');
+            button.setAttribute('title', 'Masquer');
+            button.setAttribute('aria-label', 'Masquer');
+            button.textContent = '🙈';
           }
         };
 
         const isMasked = () => input.hasAttribute('data-secret-masked');
 
-        const setLabel = () => {
-          button.textContent = isMasked() ? 'Show' : 'Hide';
-        };
-
         button.addEventListener('click', () => {
           setMasked(!isMasked());
-          setLabel();
         });
 
-        setLabel();
+        setMasked(isMasked());
+      });
+
+      document.querySelectorAll('[data-secret-copy]').forEach((button) => {
+        const inputId = button.dataset.secretCopy;
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        let resetTimer = null;
+
+        const setCopiedState = () => {
+          clearTimeout(resetTimer);
+          button.textContent = 'Copied';
+          button.setAttribute('title', 'Copié');
+          button.setAttribute('aria-label', 'Copié');
+
+          resetTimer = setTimeout(() => {
+            button.textContent = 'Copy';
+            button.setAttribute('title', 'Copier');
+            button.setAttribute('aria-label', 'Copier');
+          }, 1400);
+        };
+
+        button.addEventListener('click', async () => {
+          const value = input.value || '';
+          if (!value) return;
+
+          try {
+            if (navigator.clipboard && window.isSecureContext) {
+              await navigator.clipboard.writeText(value);
+            } else {
+              const previousMasked = input.hasAttribute('data-secret-masked');
+              input.removeAttribute('data-secret-masked');
+              input.focus();
+              input.select();
+              document.execCommand('copy');
+              input.setSelectionRange(0, 0);
+
+              if (previousMasked) {
+                input.setAttribute('data-secret-masked', '1');
+              }
+            }
+
+            setCopiedState();
+          } catch (err) {
+            console.error('Secret copy failed:', err);
+          }
+        });
+
+        button.textContent = 'Copy';
+        button.setAttribute('title', 'Copier');
+        button.setAttribute('aria-label', 'Copier');
       });
 
       const modal = document.getElementById('confirm-modal');

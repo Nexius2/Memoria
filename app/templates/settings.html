@@ -28,21 +28,34 @@
 
     <div>
       <label class="field-label">TMDb API key</label>
-      <div class="flex gap-2">
+      <div class="relative">
         <input
           id="tmdb-api-key-input"
-          class="field"
+          class="field pr-28"
           name="tmdb_api_key"
           value="{{ settings.tmdb_api_key or '' }}"
           {{ secret_input_attrs() }}
         >
-        <button
-          type="button"
-          class="btn-secondary whitespace-nowrap"
-          data-secret-toggle="tmdb-api-key-input"
-        >
-          Show
-        </button>
+        <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+          <button
+            type="button"
+            class="text-xs text-emerald-200/70 hover:text-white"
+            data-secret-copy="tmdb-api-key-input"
+            title="Copier"
+            aria-label="Copier"
+          >
+            Copy
+          </button>
+          <button
+            type="button"
+            class="text-emerald-200/70 hover:text-white"
+            data-secret-toggle="tmdb-api-key-input"
+            title="Afficher"
+            aria-label="Afficher"
+          >
+            👁
+          </button>
+        </div>
       </div>
       <div class="text-xs text-emerald-200/60 mt-1">Used to improve filmography matching and missing titles detection.</div>
     </div>
