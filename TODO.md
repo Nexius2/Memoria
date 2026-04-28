@@ -104,7 +104,6 @@ This file now focuses on what is still missing or worth improving, instead of ke
 - [x] dans settings, ne pas permettre de changer le app name
 - [x] affichage de la version en bas a droite de la page via le fichier INFO
 - [x] modifier les bouton du haut (dashboard, jobs, logs ....) en onglet plus presentable.
-- [ ] controle du multilangue et rajout dans le json du manquant.
 - [x] lenteur quand on clic sur arr
 
 ---
@@ -120,7 +119,23 @@ This file now focuses on what is still missing or worth improving, instead of ke
 ## Nice to have
 
 - [x] Global review queue for people needing manual attention
-- [ ] Better audit trail for actions taken on people
-- [ ] More helpful empty states in pages with no data
-- [ ] Optional export of people / events / missing titles
-- [ ] Better statistics around collection publishing
+- [x] Better audit trail for actions taken on people
+- [x] More helpful empty states in pages with no data
+- [x] Better statistics around collection publishing
+- [x] Better log system
+- [x] backup & auto backup system
+
+## Multilangue
+- [ ] controle du multilangue et rajout dans le json du manquant
+	- [x] socle i18n JSON + choix de langue + mode auto navigateur
+	- [ ] base layout + settings
+	- [ ] dashboard
+	- [ ] people
+	- [ ] person detail
+	- [ ] arr + missing titles
+	- [ ] jobs + logs
+	- [ ] servers
+	
+## backup
+- [ ] backup in wrong folder (doesn't display in /appdata/backups)
+- [ ] not displaying already done backups

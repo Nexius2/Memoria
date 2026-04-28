@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from ..extensions import db, scheduler
 from ..models import PlexServer, LibraryTarget
 from ..services.plex_service import PlexService
-from ..services.plex_library_cache_service import refresh_library_title_cache_safe
+from ..services.plex_local_index_service import refresh_library_local_index_safe
 
 bp = Blueprint('servers', __name__)
 
@@ -80,7 +80,7 @@ def _run_refresh_server_cache_job(app, server_id: int) -> None:
         error_count = 0
 
         for library in libraries:
-            refresh_library_title_cache_safe(library)
+            refresh_library_local_index_safe(library)
             db.session.expire_all()
 
             refreshed_library = LibraryTarget.query.get(library.id)

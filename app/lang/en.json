@@ -1,0 +1,154 @@
+{
+  "base": {
+    "html_lang": "en",
+    "title": "Memoria",
+    "tagline": "Tribute collections",
+    "nav": {
+      "dashboard": "Dashboard",
+      "jobs": "Jobs",
+      "logs": "Logs",
+      "people": "People",
+      "plex": "Plex",
+      "arr": "Arr",
+      "settings": "Settings"
+    },
+    "modal": {
+      "danger_zone": "Danger zone",
+      "confirm_deletion": "Confirm deletion",
+      "danger_text": "This action is immediate and should only be used when you really want to remove data.",
+      "continue_question": "Are you sure you want to continue?",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "secret": {
+      "show": "Show",
+      "hide": "Hide",
+      "copy": "Copy",
+      "copied": "Copied"
+    }
+  },
+  "settings": {
+    "title": "Application settings",
+    "subtitle": "All changes are saved automatically.",
+    "saved": "Saved",
+    "saving": "Saving...",
+    "error": "Error",
+    "language": {
+      "label": "Interface language *",
+      "help": "Choose a fixed language, or use the browser language automatically.",
+      "auto": "Automatic (browser language)",
+      "en": "English",
+      "fr": "French"
+    },
+    "backup": {
+      "title": "Database backups",
+      "subtitle": "Manual and automatic backups of the active SQLite database.",
+      "create_now": "Create backup now",
+      "automatic": "Automatic backup",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "checked_hourly": "Checked hourly by the scheduler, created only when the configured interval is reached.",
+      "interval": "Interval",
+      "hours_one": "{count} hour",
+      "hours_many": "{count} hours",
+      "interval_help": "Maximum frequency for automatic backup creation.",
+      "retention": "Retention",
+      "files_one": "{count} file",
+      "files_many": "{count} files",
+      "retention_help": "Oldest backups are pruned automatically after new runs.",
+      "restore_title": "How restore works",
+      "restore_text": "Restoring a backup replaces the active SQLite database with the selected backup. Before restoring, Memoria automatically creates a fresh safety backup of the current database.",
+      "active_database": "Active database:",
+      "backup_folder": "Backup folder:",
+      "latest_backup": "Latest backup:",
+      "no_backup_yet": "No backup yet",
+      "filename": "Filename",
+      "created": "Created",
+      "size": "Size",
+      "actions": "Actions",
+      "download": "Download",
+      "restore": "Restore",
+      "empty": "No backup created yet.",
+      "restore_confirm": "Restore this backup and replace the active database? A safety backup of the current database will be created first."
+    }
+  },
+  "dashboard": {
+    "stats": {
+      "active_events": "Active events",
+      "active_events_desc": "Currently visible tribute events",
+      "ending_soon": "Ending in 7 days",
+      "ending_soon_desc": "Events to watch soon",
+      "published_targets": "Published targets",
+      "published_targets_desc": "Active event publications",
+      "running_jobs": "Running jobs",
+      "running_jobs_desc": "Detection / sync / expire",
+      "missing_movies": "Missing movies",
+      "missing_movies_desc": "Total missing movie titles",
+      "missing_shows": "Missing shows",
+      "missing_shows_desc": "Total missing show titles",
+      "arr_ready_missing": "Arr-ready missing",
+      "arr_ready_missing_desc": "Missing titles that can be sent now"
+    },
+    "shortcuts": {
+      "excluded": "Excluded from auto",
+      "excluded_desc": "People manually excluded from automatic selection",
+      "ignored": "Ignored for now",
+      "ignored_desc": "People currently ignored until a future date"
+    },
+    "advanced": {
+      "title": "Dashboard details",
+      "subtitle": "Secondary widgets can be hidden to keep the dashboard focused on daily actions.",
+      "hide": "Hide advanced",
+      "show": "Show advanced"
+    },
+    "settings_snapshot": {
+      "title": "Current settings snapshot",
+      "subtitle": "Quick view of the rules currently driving automatic selection.",
+      "open_settings": "Open settings",
+      "auto_detection": "Auto detection",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "display_days": "Display days",
+      "max_people": "Max people",
+      "cached_candidates": "Cached candidates",
+      "countries": "Countries:",
+      "all_countries": "All countries"
+    },
+    "top_countries": {
+      "title": "Top countries",
+      "subtitle": "Based on currently active events.",
+      "events_one": "{count} event",
+      "events_many": "{count} events",
+      "empty": "No country data available on active events yet."
+    },
+    "status_overview": {
+      "title": "Event status overview",
+      "subtitle": "Quick counters for all tribute events.",
+      "active": "Active",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "total": "Total"
+    },
+    "publishing": {
+      "title": "Collection publishing overview",
+      "subtitle": "Current publication health for live active events.",
+      "total": "{count} total",
+      "synced": "Synced",
+      "missing": "Missing",
+      "errors": "Errors",
+      "pending": "Pending",
+      "stale": "Stale syncs",
+      "zero_media": "Zero media",
+      "top_targets": "Top published libraries"
+    },
+    "problematic": {
+      "title": "Problematic events",
+      "subtitle": "Active events needing attention.",
+      "total": "{count} total",
+      "days_one": "{count} day",
+      "days_many": "{count} days",
+      "show_cta": "Show problematic events",
+      "empty": "No obvious anomaly on active events."
+    }
+  }
+}

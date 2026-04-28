@@ -8,6 +8,8 @@ from ..models import AppSettings, TributeEvent, CollectionPublication, LibraryTa
 from .plex_service import PlexService
 from .tmdb_service import TmdbService
 from .plex_library_cache_service import filter_credits_with_library_cache
+from .plex_local_index_service import find_local_matches_for_target
+from .media_identity_service import enrich_credit_list_external_ids
 
 def _log_app_event(
     level: str,
@@ -59,18 +61,62 @@ def _load_tmdb_credits(person, settings: AppSettings) -> dict | None:
         tmdb = TmdbService(settings.tmdb_api_key)
 
         if not person.tmdb_person_id:
-            match = tmdb.search_person(person.name)
+            match = tmdb.search_person(
+                person.name,
+                death_date=person.death_date.isoformat() if person.death_date else None,
+            )
             if not match:
                 return None
 
             person.tmdb_person_id = match.get('id')
             db.session.flush()
 
-        return tmdb.person_credits(person.tmdb_person_id)
+        tmdb_credits = tmdb.person_credits(person.tmdb_person_id)
+        return {
+            'cast': enrich_credit_list_external_ids(tmdb_credits.get('cast') or [], tmdb=tmdb),
+            'crew': enrich_credit_list_external_ids(tmdb_credits.get('crew') or [], tmdb=tmdb),
+        }
 
     except Exception:
         current_app.logger.exception("TMDb lookup failed for person %s", person.name)
         return None
+
+def _load_tmdb_person_aliases(person, settings: AppSettings) -> list[str]:
+    if not settings.tmdb_api_key:
+        return []
+
+    try:
+        tmdb = TmdbService(settings.tmdb_api_key)
+
+        if not person.tmdb_person_id:
+            match = tmdb.search_person(
+                person.name,
+                death_date=person.death_date.isoformat() if person.death_date else None,
+            )
+            if not match:
+                return []
+
+            person.tmdb_person_id = match.get('id')
+            db.session.flush()
+
+        details = tmdb.person_details(person.tmdb_person_id)
+        aliases = details.get('also_known_as') or []
+
+        output: list[str] = []
+        seen: set[str] = set()
+        for raw_alias in aliases:
+            clean_alias = (raw_alias or '').strip()
+            normalized_alias = clean_alias.casefold()
+            if not clean_alias or normalized_alias in seen:
+                continue
+            seen.add(normalized_alias)
+            output.append(clean_alias)
+
+        return output
+
+    except Exception:
+        current_app.logger.exception("TMDb alias lookup failed for person %s", person.name)
+        return []
 
 def _load_tmdb_person_poster_url(person, settings: AppSettings) -> str | None:
     if not settings.tmdb_api_key:
@@ -96,10 +142,58 @@ def _load_tmdb_person_poster_url(person, settings: AppSettings) -> str | None:
         current_app.logger.exception("TMDb poster lookup failed for person %s", person.name)
         return None
 
-def _find_matches_for_target(plex: PlexService, target, person, tmdb_credits: dict | None):
+def _find_matches_for_target(plex: PlexService, target, person, tmdb_credits: dict | None, person_aliases: list[str] | None = None):
+    matches_by_rating_key: dict[str, object] = {}
+    media_type = 'movie' if target.media_type == 'movie' else 'tv'
+
+    def add_matches(matches):
+        for match in matches or []:
+            rating_key = str(getattr(match.item, 'ratingKey', '')).strip()
+            if not rating_key:
+                continue
+            if rating_key in matches_by_rating_key:
+                continue
+            matches_by_rating_key[rating_key] = match
+
+    local_entries = find_local_matches_for_target(
+        target,
+        person_name=person.name,
+        aliases=person_aliases,
+        tmdb_credits=tmdb_credits,
+        media_type=media_type,
+    )
+
+    if local_entries:
+        local_matches = plex.resolve_local_cache_entries_to_items(
+            target.section_name,
+            local_entries,
+            media_type=media_type,
+        )
+        add_matches(local_matches)
+
+    if matches_by_rating_key:
+        return list(matches_by_rating_key.values())
+
+    plex_matches = plex.find_person_items(
+        target.section_name,
+        person.name,
+        aliases=person_aliases,
+    )
+    add_matches(plex_matches)
+
+
+
     if tmdb_credits:
-        media_type = 'movie' if target.media_type == 'movie' else 'tv'
         credits = (tmdb_credits.get('cast') or []) + (tmdb_credits.get('crew') or [])
+
+        try:
+            credits = sorted(
+                credits,
+                key=lambda x: x.get('popularity') or 0,
+                reverse=True
+            )
+        except Exception:
+            current_app.logger.exception("Failed to sort credits by popularity")
 
         cached_credits = filter_credits_with_library_cache(
             target,
@@ -113,10 +207,11 @@ def _find_matches_for_target(plex: PlexService, target, person, tmdb_credits: di
                 cached_credits,
                 media_type=media_type,
             )
-            if title_matches:
-                return title_matches
+            add_matches(title_matches)
 
-    return plex.find_person_items(target.section_name, person.name)
+
+
+    return list(matches_by_rating_key.values())
 
 
 def sync_event(event: TributeEvent) -> None:
@@ -124,6 +219,7 @@ def sync_event(event: TributeEvent) -> None:
     person = event.person
     tmdb_credits = _load_tmdb_credits(person, settings)
     tmdb_person_poster_url = _load_tmdb_person_poster_url(person, settings)
+    person_aliases = _load_tmdb_person_aliases(person, settings)
 
     targets = (
         db.session.query(LibraryTarget)
@@ -168,6 +264,7 @@ def sync_event(event: TributeEvent) -> None:
                 target=target,
                 person=person,
                 tmdb_credits=tmdb_credits,
+                person_aliases=person_aliases,
             )
 
             title = render_template_text(
@@ -344,7 +441,7 @@ def remove_event_collections(event: TributeEvent) -> dict:
                 publication.collection_title,
             )
 
-            if message.startswith('Collection deleted |'):
+            if message.startswith('Collection deleted'):
                 publication.status = 'removed'
                 publication.last_message = message
                 publication.last_synced_at = datetime.utcnow()
@@ -364,11 +461,11 @@ def remove_event_collections(event: TributeEvent) -> dict:
                 )
                 continue
 
-            if message.startswith('Collection not found |'):
-                publication.status = 'error'
+            if message.startswith('Collection not found'):
+                publication.status = 'removed'
                 publication.last_message = message
                 publication.last_synced_at = datetime.utcnow()
-                error_items += 1
+                removed_items += 1
 
                 _log_app_event(
                     'warning',

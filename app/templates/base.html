@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ t('base.html_lang', default='en') }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Memoria</title>
+  <title>{{ t('base.title', default='Memoria') }}</title>
 
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon/favicon-32x32.png') }}">
@@ -28,11 +28,11 @@
   </div>
 
   <div class="text-sm uppercase tracking-[0.35em] text-emerald-300/70 leading-none">
-    Tribute collections
+    {{ t('base.tagline', default='Tribute collections') }}
   </div>
 
   <h1 class="text-3xl font-bold text-white leading-none">
-    Memoria
+    {{ t('base.title', default='Memoria') }}
   </h1>
 </div>
         {% set current_endpoint = request.endpoint or '' %}
@@ -41,49 +41,49 @@
             class="nav-tab {{ 'is-active' if current_endpoint == 'main.dashboard' else '' }}"
             href="{{ url_for('main.dashboard') }}"
           >
-            <span>Dashboard</span>
+            <span>{{ t('base.nav.dashboard', default='Dashboard') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'main.jobs' else '' }}"
             href="{{ url_for('main.jobs') }}"
           >
-            <span>Jobs</span>
+            <span>{{ t('base.nav.jobs', default='Jobs') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'main.logs' else '' }}"
             href="{{ url_for('main.logs') }}"
           >
-            <span>Logs</span>
+            <span>{{ t('base.nav.logs', default='Logs') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'people.index' or current_endpoint == 'people.detail' or current_endpoint == 'people.review' else '' }}"
             href="{{ url_for('people.index') }}"
           >
-            <span>People</span>
+            <span>{{ t('base.nav.people', default='People') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'servers.index' else '' }}"
             href="{{ url_for('servers.index') }}"
           >
-            <span>Plex</span>
+            <span>{{ t('base.nav.plex', default='Plex') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'arr.index' else '' }}"
             href="{{ url_for('arr.index') }}"
           >
-            <span>Arr</span>
+            <span>{{ t('base.nav.arr', default='Arr') }}</span>
           </a>
 
           <a
             class="nav-tab {{ 'is-active' if current_endpoint == 'settings.index' else '' }}"
             href="{{ url_for('settings.index') }}"
           >
-            <span>Settings</span>
+            <span>{{ t('base.nav.settings', default='Settings') }}</span>
           </a>
         </nav>
       </div>
@@ -112,7 +112,6 @@
     </div>
   {% endif %}
 
-  <!-- Global confirm modal -->
   <div
     id="confirm-modal"
     class="hidden fixed inset-0 z-50"
@@ -129,12 +128,12 @@
           </div>
 
           <div class="min-w-0 flex-1">
-            <div class="text-[11px] uppercase tracking-[0.35em] text-rose-300/70">Danger zone</div>
+            <div class="text-[11px] uppercase tracking-[0.35em] text-rose-300/70">{{ t('base.modal.danger_zone', default='Danger zone') }}</div>
             <h3 id="confirm-modal-title" class="mt-2 text-2xl font-bold text-white">
-              Confirm deletion
+              {{ t('base.modal.confirm_deletion', default='Confirm deletion') }}
             </h3>
             <p class="mt-2 text-sm text-emerald-100/55">
-              This action is immediate and should only be used when you really want to remove data.
+              {{ t('base.modal.danger_text', default='This action is immediate and should only be used when you really want to remove data.') }}
             </p>
           </div>
         </div>
@@ -142,7 +141,7 @@
 
       <div class="px-6 py-6">
         <p id="confirm-modal-message" class="text-base leading-7 text-emerald-100/80">
-          Are you sure you want to continue?
+          {{ t('base.modal.continue_question', default='Are you sure you want to continue?') }}
         </p>
       </div>
 
@@ -152,7 +151,7 @@
           id="confirm-modal-cancel"
           class="btn-secondary"
         >
-          Cancel
+          {{ t('base.modal.cancel', default='Cancel') }}
         </button>
 
         <button
@@ -160,7 +159,7 @@
           id="confirm-modal-confirm"
           class="btn-danger"
         >
-          Delete
+          {{ t('base.modal.delete', default='Delete') }}
         </button>
       </div>
     </div>
@@ -169,6 +168,16 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const i18n = {
+        secretShow: {{ t('base.secret.show', default='Show')|tojson }},
+        secretHide: {{ t('base.secret.hide', default='Hide')|tojson }},
+        secretCopy: {{ t('base.secret.copy', default='Copy')|tojson }},
+        secretCopied: {{ t('base.secret.copied', default='Copied')|tojson }},
+        confirmDeletion: {{ t('base.modal.confirm_deletion', default='Confirm deletion')|tojson }},
+        continueQuestion: {{ t('base.modal.continue_question', default='Are you sure you want to continue?')|tojson }},
+        deleteLabel: {{ t('base.modal.delete', default='Delete')|tojson }}
+      };
+
       const formatLocalDateTime = (isoValue, withSeconds = false) => {
         if (!isoValue) {
           return '—';
@@ -211,13 +220,13 @@
         const setMasked = (masked) => {
           if (masked) {
             input.setAttribute('data-secret-masked', '1');
-            button.setAttribute('title', 'Afficher');
-            button.setAttribute('aria-label', 'Afficher');
+            button.setAttribute('title', i18n.secretShow);
+            button.setAttribute('aria-label', i18n.secretShow);
             button.textContent = '👁';
           } else {
             input.removeAttribute('data-secret-masked');
-            button.setAttribute('title', 'Masquer');
-            button.setAttribute('aria-label', 'Masquer');
+            button.setAttribute('title', i18n.secretHide);
+            button.setAttribute('aria-label', i18n.secretHide);
             button.textContent = '🙈';
           }
         };
@@ -240,14 +249,14 @@
 
         const setCopiedState = () => {
           clearTimeout(resetTimer);
-          button.textContent = 'Copied';
-          button.setAttribute('title', 'Copié');
-          button.setAttribute('aria-label', 'Copié');
+          button.textContent = i18n.secretCopied;
+          button.setAttribute('title', i18n.secretCopied);
+          button.setAttribute('aria-label', i18n.secretCopied);
 
           resetTimer = setTimeout(() => {
-            button.textContent = 'Copy';
-            button.setAttribute('title', 'Copier');
-            button.setAttribute('aria-label', 'Copier');
+            button.textContent = i18n.secretCopy;
+            button.setAttribute('title', i18n.secretCopy);
+            button.setAttribute('aria-label', i18n.secretCopy);
           }, 1400);
         };
 
@@ -277,9 +286,9 @@
           }
         });
 
-        button.textContent = 'Copy';
-        button.setAttribute('title', 'Copier');
-        button.setAttribute('aria-label', 'Copier');
+        button.textContent = i18n.secretCopy;
+        button.setAttribute('title', i18n.secretCopy);
+        button.setAttribute('aria-label', i18n.secretCopy);
       });
 
       const modal = document.getElementById('confirm-modal');
@@ -291,9 +300,9 @@
       let pendingForm = null;
 
       const openModal = ({ title, message, confirmText }) => {
-        if (modalTitle) modalTitle.textContent = title || 'Confirm deletion';
-        if (modalMessage) modalMessage.textContent = message || 'Are you sure you want to continue?';
-        if (confirmBtn) confirmBtn.textContent = confirmText || 'Delete';
+        if (modalTitle) modalTitle.textContent = title || i18n.confirmDeletion;
+        if (modalMessage) modalMessage.textContent = message || i18n.continueQuestion;
+        if (confirmBtn) confirmBtn.textContent = confirmText || i18n.deleteLabel;
 
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
@@ -312,9 +321,9 @@
           pendingForm = form;
 
           openModal({
-            title: form.dataset.confirmTitle || 'Confirm deletion',
-            message: form.dataset.confirmMessage || 'Are you sure you want to continue?',
-            confirmText: form.dataset.confirmButton || 'Delete',
+            title: form.dataset.confirmTitle || i18n.confirmDeletion,
+            message: form.dataset.confirmMessage || i18n.continueQuestion,
+            confirmText: form.dataset.confirmButton || i18n.deleteLabel,
           });
         });
       });

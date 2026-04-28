@@ -1,23 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="panel mb-6">
-  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-    <div>
-      <h2 class="text-2xl font-semibold text-white section-title-with-icon">
-        <span class="section-title-icon">◷</span>
-        <span>Job history</span>
-      </h2>
-      <p class="text-sm text-emerald-200/70 mt-1">
-        Review recent detection, sync and expire background jobs.
-      </p>
-    </div>
 
-    <div class="text-xs text-emerald-200/60">
-      {{ job_rows|length }} row{{ 's' if job_rows|length != 1 else '' }} shown
-    </div>
-  </div>
-</div>
 
 <div class="panel">
   <form method="get" action="{{ url_for('main.jobs') }}" class="filter-toolbar">
@@ -26,9 +10,14 @@
         <div class="filter-toolbar-title">Filters</div>
         <div class="filter-toolbar-subtitle">Refine job history without mixing filters and data actions.</div>
       </div>
-      <div class="filter-toolbar-meta">
-        Current page: {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
-      </div>
+		  <div>
+			  <div class="text-xs text-emerald-200/60">
+			  {{ job_rows|length }} row{{ 's' if job_rows|length != 1 else '' }} shown
+			  </div>
+			  <div class="filter-toolbar-meta">
+				Current page: {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
+			  </div>
+		</div>
     </div>
 
     <div class="filter-toolbar-grid cols-6">
@@ -176,8 +165,13 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="8" class="py-8 text-center text-emerald-200/60">
-              No job found for the current filters.
+            <td colspan="8" class="py-6">
+              {% set empty_state_icon = '🛠' %}
+              {% set empty_state_title = 'No jobs found' %}
+              {% set empty_state_message = 'No background job matches the current filters. Try resetting the filters or launch a new detection, sync or expire action from the dashboard.' %}
+              {% set empty_state_action_url = url_for('main.dashboard') %}
+              {% set empty_state_action_label = 'Open dashboard' %}
+              {% include '_empty_state.html' %}
             </td>
           </tr>
         {% endfor %}

@@ -13,6 +13,7 @@ class TmdbService:
 
     def __init__(self, api_key: str):
         self.api_key = api_key
+        self._external_ids_cache: dict[tuple[str, int], dict] = {}
 
     def _get(self, path: str, params: dict | None = None):
         params = params or {}
@@ -446,6 +447,41 @@ class TmdbService:
 
     def person_external_ids(self, person_id: int) -> dict:
         return self._get(f'/person/{person_id}/external_ids')
+
+    def media_external_ids(self, media_type: str, media_id: int) -> dict:
+        media_type = 'tv' if media_type == 'tv' else 'movie'
+        media_id = int(media_id)
+        cache_key = (media_type, media_id)
+
+        if cache_key in self._external_ids_cache:
+            return self._external_ids_cache[cache_key]
+
+        data = self._get(f'/{media_type}/{media_id}/external_ids')
+        self._external_ids_cache[cache_key] = data or {}
+        return self._external_ids_cache[cache_key]
+
+    def enrich_credit_external_ids(self, credit: dict) -> dict:
+        enriched = dict(credit or {})
+        media_type = enriched.get('media_type')
+        media_id = enriched.get('id')
+
+        if media_type not in {'movie', 'tv'} or media_id is None:
+            return enriched
+
+        try:
+            external_ids = self.media_external_ids(media_type, int(media_id))
+        except Exception:
+            return enriched
+
+        imdb_id = str(external_ids.get('imdb_id') or '').strip()
+        if imdb_id and not enriched.get('imdb_id'):
+            enriched['imdb_id'] = imdb_id
+
+        tvdb_id = external_ids.get('tvdb_id')
+        if tvdb_id not in (None, '') and not enriched.get('tvdb_id'):
+            enriched['tvdb_id'] = tvdb_id
+
+        return enriched
 
     def person_credits(self, person_id: int) -> dict:
         return self._get(f'/person/{person_id}/combined_credits')

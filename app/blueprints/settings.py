@@ -1,8 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file
 
 from ..extensions import db
 from ..models import AppSettings
 from ..utils.country_utils import normalize_countries_csv
+from ..services.backup_service import (
+    list_database_backups,
+    create_database_backup,
+    restore_database_backup,
+    get_backup_directory,
+    get_database_path,
+    get_latest_backup_info,
+)
 
 bp = Blueprint('settings', __name__)
 
@@ -27,7 +35,17 @@ def _parse_positive_int(field_name: str, label: str, minimum: int = 1) -> int:
 @bp.route('/')
 def index():
     settings = AppSettings.get_or_create()
-    return render_template('settings.html', settings=settings)
+    backups = list_database_backups()
+    latest_backup = get_latest_backup_info()
+
+    return render_template(
+        'settings.html',
+        settings=settings,
+        backups=backups,
+        latest_backup=latest_backup,
+        backup_directory=str(get_backup_directory()),
+        database_path=str(get_database_path()),
+    )
 
 
 @bp.post('/save')
@@ -48,7 +66,12 @@ def save():
         if default_media_mode not in {'both', 'movie', 'show'}:
             raise ValueError('Default media mode is invalid.')
 
+        ui_language = (request.form.get('ui_language') or 'auto').strip().lower()
+        if ui_language not in {'auto', 'en', 'fr'}:
+            raise ValueError('Interface language is invalid.')
 
+
+        settings.ui_language = ui_language
         settings.auto_detection_enabled = request.form.get('auto_detection_enabled') == 'on'
         settings.detection_window_days = _parse_positive_int(
             'detection_window_days',
@@ -78,6 +101,15 @@ def save():
         settings.arr_activity_retention_days = _parse_positive_int(
             'arr_activity_retention_days',
             'Arr activity retention days',
+        )
+        settings.auto_backup_enabled = request.form.get('auto_backup_enabled') == 'on'
+        settings.backup_interval_hours = _parse_positive_int(
+            'backup_interval_hours',
+            'Backup interval hours',
+        )
+        settings.backup_retention_count = _parse_positive_int(
+            'backup_retention_count',
+            'Backup retention count',
         )
         settings.countries_csv = normalize_countries_csv(request.form.get('countries_csv') or '')
         settings.professions_csv = (request.form.get('professions_csv') or '').strip()
@@ -117,4 +149,54 @@ def save():
         return jsonify({'ok': True, 'message': 'Saved'})
 
     flash('Settings saved.', 'success')
+    return redirect(url_for('settings.index'))
+
+@bp.post('/backup-now')
+def backup_now():
+    try:
+        backup_path = create_database_backup(trigger='manual')
+        flash(f'Database backup created: {backup_path.name}', 'success')
+    except Exception as exc:
+        flash(f'Backup failed: {exc}', 'danger')
+
+    return redirect(url_for('settings.index'))
+
+
+@bp.get('/backups/<path:filename>')
+def download_backup(filename: str):
+    backup_dir = get_backup_directory()
+    backup_path = (backup_dir / filename).resolve()
+
+    if backup_path.parent != backup_dir.resolve() or not backup_path.exists():
+        flash('Backup file not found.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    return send_file(
+        backup_path,
+        as_attachment=True,
+        download_name=backup_path.name,
+    )
+
+@bp.post('/backups/<path:filename>/restore')
+def restore_backup(filename: str):
+    try:
+        result = restore_database_backup(filename, create_safety_backup=True)
+
+        safety_backup_path = result.get('safety_backup_path')
+        restored_from = result.get('restored_from')
+
+        if safety_backup_path is not None:
+            flash(
+                f'Database restored from {restored_from.name}. Safety backup created first: {safety_backup_path.name}.',
+                'success',
+            )
+        else:
+            flash(
+                f'Database restored from {restored_from.name}.',
+                'success',
+            )
+
+    except Exception as exc:
+        flash(f'Restore failed: {exc}', 'danger')
+
     return redirect(url_for('settings.index'))

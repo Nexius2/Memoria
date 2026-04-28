@@ -1931,6 +1931,17 @@ def detail(person_id: int):
         .all()
     )
 
+    person_activity_history = (
+        AppLog.query
+        .filter(
+            AppLog.related_type == 'person',
+            AppLog.related_id == person.id,
+        )
+        .order_by(AppLog.created_at.desc(), AppLog.id.desc())
+        .limit(20)
+        .all()
+    )
+
     return render_template(
         'person_detail.html',
         person=person,
@@ -1950,6 +1961,7 @@ def detail(person_id: int):
         show_library_targets=show_library_targets,
         duplicates=duplicates,
         matching_history=matching_history,
+        person_activity_history=person_activity_history,
     )
 
 @bp.post('/<int:person_id>/selection-settings')

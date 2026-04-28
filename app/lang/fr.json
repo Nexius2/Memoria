@@ -1,0 +1,154 @@
+{
+  "base": {
+    "html_lang": "fr",
+    "title": "Memoria",
+    "tagline": "Collections hommage",
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "jobs": "Tâches",
+      "logs": "Logs",
+      "people": "People",
+      "plex": "Plex",
+      "arr": "Arr",
+      "settings": "Paramètres"
+    },
+    "modal": {
+      "danger_zone": "Zone sensible",
+      "confirm_deletion": "Confirmer la suppression",
+      "danger_text": "Cette action est immédiate et doit seulement être utilisée si tu veux vraiment supprimer des données.",
+      "continue_question": "Es-tu sûr de vouloir continuer ?",
+      "cancel": "Annuler",
+      "delete": "Supprimer"
+    },
+    "secret": {
+      "show": "Afficher",
+      "hide": "Masquer",
+      "copy": "Copier",
+      "copied": "Copié"
+    }
+  },
+  "settings": {
+    "title": "Paramètres de l’application",
+    "subtitle": "Toutes les modifications sont enregistrées automatiquement.",
+    "saved": "Enregistré",
+    "saving": "Enregistrement...",
+    "error": "Erreur",
+    "language": {
+      "label": "Langue de l’interface *",
+      "help": "Choisis une langue fixe, ou utilise automatiquement la langue du navigateur.",
+      "auto": "Automatique (langue du navigateur)",
+      "en": "Anglais",
+      "fr": "Français"
+    },
+    "backup": {
+      "title": "Sauvegardes de la base",
+      "subtitle": "Sauvegardes manuelles et automatiques de la base SQLite active.",
+      "create_now": "Créer une sauvegarde maintenant",
+      "automatic": "Sauvegarde automatique",
+      "enabled": "Activée",
+      "disabled": "Désactivée",
+      "checked_hourly": "Vérifiée chaque heure par le scheduler, créée uniquement quand l’intervalle configuré est atteint.",
+      "interval": "Intervalle",
+      "hours_one": "{count} heure",
+      "hours_many": "{count} heures",
+      "interval_help": "Fréquence maximale de création automatique des sauvegardes.",
+      "retention": "Rétention",
+      "files_one": "{count} fichier",
+      "files_many": "{count} fichiers",
+      "retention_help": "Les sauvegardes les plus anciennes sont supprimées automatiquement après les nouveaux runs.",
+      "restore_title": "Fonctionnement de la restauration",
+      "restore_text": "Restaurer une sauvegarde remplace la base SQLite active par la sauvegarde sélectionnée. Avant la restauration, Memoria crée automatiquement une nouvelle sauvegarde de sécurité de la base actuelle.",
+      "active_database": "Base active :",
+      "backup_folder": "Dossier des sauvegardes :",
+      "latest_backup": "Dernière sauvegarde :",
+      "no_backup_yet": "Aucune sauvegarde pour le moment",
+      "filename": "Nom du fichier",
+      "created": "Créée le",
+      "size": "Taille",
+      "actions": "Actions",
+      "download": "Télécharger",
+      "restore": "Restaurer",
+      "empty": "Aucune sauvegarde créée pour le moment.",
+      "restore_confirm": "Restaurer cette sauvegarde et remplacer la base active ? Une sauvegarde de sécurité de la base actuelle sera créée d’abord."
+    }
+  },
+  "dashboard": {
+    "stats": {
+      "active_events": "Événements actifs",
+      "active_events_desc": "Événements hommage visibles",
+      "ending_soon": "Se termine dans 7 jours",
+      "ending_soon_desc": "Événements à surveiller bientôt",
+      "published_targets": "Cibles publiées",
+      "published_targets_desc": "Publications des événements actifs",
+      "running_jobs": "Tâches en cours",
+      "running_jobs_desc": "Détection / sync / expiration",
+      "missing_movies": "Films manquants",
+      "missing_movies_desc": "Total des films manquants",
+      "missing_shows": "Séries manquantes",
+      "missing_shows_desc": "Total des séries manquantes",
+      "arr_ready_missing": "Manquants prêts pour Arr",
+      "arr_ready_missing_desc": "Titres manquants qui peuvent être envoyés maintenant"
+    },
+    "shortcuts": {
+      "excluded": "Exclus de l’auto",
+      "excluded_desc": "People exclus manuellement de la sélection automatique",
+      "ignored": "Ignorés pour le moment",
+      "ignored_desc": "People actuellement ignorés jusqu’à une date future"
+    },
+    "advanced": {
+      "title": "Détails du dashboard",
+      "subtitle": "Les widgets secondaires peuvent être masqués pour garder le dashboard centré sur les actions quotidiennes.",
+      "hide": "Masquer l’avancé",
+      "show": "Afficher l’avancé"
+    },
+    "settings_snapshot": {
+      "title": "Aperçu des réglages actuels",
+      "subtitle": "Vue rapide des règles qui pilotent actuellement la sélection automatique.",
+      "open_settings": "Ouvrir les paramètres",
+      "auto_detection": "Détection auto",
+      "enabled": "Activée",
+      "disabled": "Désactivée",
+      "display_days": "Jours affichés",
+      "max_people": "People max",
+      "cached_candidates": "Candidats en cache",
+      "countries": "Pays :",
+      "all_countries": "Tous les pays"
+    },
+    "top_countries": {
+      "title": "Top pays",
+      "subtitle": "Basé sur les événements actuellement actifs.",
+      "events_one": "{count} événement",
+      "events_many": "{count} événements",
+      "empty": "Aucune donnée de pays disponible pour les événements actifs pour le moment."
+    },
+    "status_overview": {
+      "title": "Vue d’ensemble des statuts d’événements",
+      "subtitle": "Compteurs rapides pour tous les événements hommage.",
+      "active": "Actifs",
+      "expired": "Expirés",
+      "cancelled": "Annulés",
+      "total": "Total"
+    },
+    "publishing": {
+      "title": "Vue d’ensemble des publications de collections",
+      "subtitle": "Santé actuelle des publications pour les événements actifs en cours.",
+      "total": "{count} au total",
+      "synced": "Synchronisées",
+      "missing": "Manquantes",
+      "errors": "Erreurs",
+      "pending": "En attente",
+      "stale": "Syncs obsolètes",
+      "zero_media": "Zéro média",
+      "top_targets": "Bibliothèques les plus publiées"
+    },
+    "problematic": {
+      "title": "Événements problématiques",
+      "subtitle": "Événements actifs qui demandent une attention.",
+      "total": "{count} au total",
+      "days_one": "{count} jour",
+      "days_many": "{count} jours",
+      "show_cta": "Afficher les événements problématiques",
+      "empty": "Aucune anomalie évidente sur les événements actifs."
+    }
+  }
+}

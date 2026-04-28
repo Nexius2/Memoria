@@ -12,6 +12,7 @@ class TimestampMixin:
 class AppSettings(db.Model, TimestampMixin):
     id = db.Column(db.Integer, primary_key=True)
     app_name = db.Column(db.String(120), default='Memoria')
+    ui_language = db.Column(db.String(10), default='auto', nullable=False)
     auto_detection_enabled = db.Column(db.Boolean, default=False, nullable=False)
     detection_window_days = db.Column(db.Integer, default=2, nullable=False)
     display_days = db.Column(db.Integer, default=7, nullable=False)
@@ -31,12 +32,16 @@ class AppSettings(db.Model, TimestampMixin):
     deduplicate_people = db.Column(db.Boolean, default=True, nullable=False)
     tmdb_api_key = db.Column(db.String(255), nullable=True)
     auto_missing_titles_enabled = db.Column(db.Boolean, default=True, nullable=False)
-    missing_titles_refresh_hours = db.Column(db.Integer, default=24, nullable=False)
+    missing_titles_refresh_hours = db.Column(db.Integer, default=12, nullable=False)
     auto_arr_enabled = db.Column(db.Boolean, default=True, nullable=False)
 
     log_retention_days = db.Column(db.Integer, default=30, nullable=False)
     job_retention_days = db.Column(db.Integer, default=30, nullable=False)
     arr_activity_retention_days = db.Column(db.Integer, default=90, nullable=False)
+
+    auto_backup_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    backup_interval_hours = db.Column(db.Integer, default=24, nullable=False)
+    backup_retention_count = db.Column(db.Integer, default=14, nullable=False)
 
     web_source = db.Column(db.String(30), default='wikidata', nullable=False)
 
@@ -118,6 +123,33 @@ class LibraryTarget(db.Model, TimestampMixin):
     publications = db.relationship('CollectionPublication', back_populates='target', cascade='all, delete-orphan')
 
 
+class PlexMediaIndex(db.Model, TimestampMixin):
+    id = db.Column(db.Integer, primary_key=True)
+
+    target_id = db.Column(db.Integer, db.ForeignKey('library_target.id'), nullable=False, index=True)
+    plex_server_id = db.Column(db.Integer, db.ForeignKey('plex_server.id'), nullable=False, index=True)
+
+    rating_key = db.Column(db.String(64), nullable=False, index=True)
+    media_type = db.Column(db.String(20), nullable=False, index=True)  # movie / show
+
+    title = db.Column(db.String(255), nullable=False)
+    original_title = db.Column(db.String(255), nullable=True)
+    year = db.Column(db.Integer, nullable=True)
+
+    tmdb_id = db.Column(db.String(64), nullable=True, index=True)
+    imdb_id = db.Column(db.String(64), nullable=True, index=True)
+    tvdb_id = db.Column(db.String(64), nullable=True, index=True)
+
+    raw_titles_json = db.Column(db.Text, default='[]', nullable=False)
+    normalized_titles_json = db.Column(db.Text, default='[]', nullable=False)
+    normalized_people_json = db.Column(db.Text, default='[]', nullable=False)
+
+    scanned_at = db.Column(db.DateTime, nullable=True)
+
+    target = db.relationship('LibraryTarget')
+    plex_server = db.relationship('PlexServer')
+
+
 class Person(db.Model, TimestampMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
@@ -182,9 +214,10 @@ class DetectionRun(db.Model, TimestampMixin):
 
 class TaskRun(db.Model, TimestampMixin):
     id = db.Column(db.Integer, primary_key=True)
-    task_type = db.Column(db.String(30), nullable=False)  # sync / expire
+    task_type = db.Column(db.String(30), nullable=False)  # sync / expire / plex_cache
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending/running/success/error
     requested_by = db.Column(db.String(20), default='manual', nullable=False)
+    plex_server_id = db.Column(db.Integer, db.ForeignKey('plex_server.id'), nullable=True)
 
     total_items = db.Column(db.Integer, default=0, nullable=False)
     processed_items = db.Column(db.Integer, default=0, nullable=False)

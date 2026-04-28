@@ -2,8 +2,8 @@
 {% block content %}
 
 
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-6 items-start">
-  <div class="xl:col-span-4 space-y-6">
+<div class="person-detail-masonry mb-6">
+  <div class="person-detail-card person-detail-card--profile">
     <div class="panel">
       <div class="space-y-5">
         <div class="grid grid-cols-1 sm:grid-cols-[112px_minmax(0,1fr)] gap-4 items-start">
@@ -123,9 +123,11 @@
         {% endif %}
       </div>
     </div>
+  </div>
 
-    <div class="panel">
-      <h3 class="text-xl font-semibold text-white mb-4">Trigger tribute event</h3>
+  <div class="person-detail-card person-detail-card--trigger person-detail-card--compact">
+      <div class="panel">
+        <h3 class="text-xl font-semibold text-white mb-4">Trigger tribute event</h3>
 
       <form
         method="post"
@@ -156,10 +158,12 @@
           <button class="btn-primary">Create / retrigger</button>
         </div>
       </form>
+      </div>
     </div>
 
-    <div class="panel">
-      <h3 class="text-xl font-semibold text-white mb-4">Recent matching / selection history</h3>
+    <div class="person-detail-card person-detail-card--history">
+      <div class="panel">
+        <h3 class="text-xl font-semibold text-white mb-4">Recent matching / selection history</h3>
 
       {% if matching_history %}
         <div class="space-y-3 person-detail-scroll">
@@ -196,10 +200,79 @@
           No TMDb or selection history recorded yet for this person.
         </div>
       {% endif %}
+      </div>
     </div>
-  </div>
 
-  <div class="xl:col-span-8 space-y-6">
+    <div class="person-detail-card person-detail-card--activity">
+      <div class="panel">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-xl font-semibold text-white">Recent person activity</h3>
+          <p class="text-sm text-emerald-200/70 mt-1">
+            Latest actions, syncs, Arr pushes and errors related to this person.
+          </p>
+        </div>
+
+        <div class="text-xs text-emerald-200/60">
+          Last {{ person_activity_history|length }} entries
+        </div>
+      </div>
+
+      {% if person_activity_history %}
+        <div class="space-y-3 person-detail-scroll">
+          {% for row in person_activity_history %}
+            <div class="rounded-2xl border border-emerald-400/10 bg-black/10 px-4 py-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  {% if row.source == 'tmdb' %}
+                    <span class="inline-tag inline-tag--sky">TMDb</span>
+                  {% elif row.source == 'people' %}
+                    <span class="inline-tag inline-tag--emerald">People</span>
+                  {% elif row.source == 'collections' %}
+                    <span class="inline-tag inline-tag--amber">Collections</span>
+                  {% elif row.source == 'arr' %}
+                    <span class="inline-tag inline-tag--rose">Arr</span>
+                  {% elif row.source == 'scheduler' %}
+                    <span class="inline-tag inline-tag--sky">Scheduler</span>
+                  {% else %}
+                    <span class="inline-tag inline-tag--emerald">{{ row.source }}</span>
+                  {% endif %}
+
+                  {% if row.level == 'error' %}
+                    <span class="inline-tag inline-tag--rose">Error</span>
+                  {% elif row.level == 'warning' %}
+                    <span class="inline-tag inline-tag--amber">Warning</span>
+                  {% else %}
+                    <span class="inline-tag inline-tag--emerald">Info</span>
+                  {% endif %}
+                </div>
+
+                <span class="text-xs text-emerald-200/60">
+                  {{ row.created_at.strftime('%Y-%m-%d %H:%M') if row.created_at else '—' }}
+                </span>
+              </div>
+
+              <div class="mt-2 text-sm text-white break-words">
+                {{ row.message }}
+              </div>
+
+              {% if row.details %}
+                <div class="mt-2 text-xs text-emerald-100/70 break-words whitespace-pre-line">
+                  {{ row.details }}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-sm text-emerald-200/60">
+          No activity recorded yet for this person.
+        </div>
+      {% endif %}
+      </div>
+    </div>
+
+  <div class="person-detail-card person-detail-card--tmdb">
     {% if settings.tmdb_api_key %}
       <div class="panel">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -369,8 +442,9 @@
     {% endif %}
 
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-      <div class="panel">
-        <h3 class="text-xl font-semibold text-white mb-4">Selection control</h3>
+      <div class="person-detail-card person-detail-card--selection person-detail-card--compact">
+        <div class="panel">
+          <h3 class="text-xl font-semibold text-white mb-4">Selection control</h3>
 
         <form method="post" action="{{ url_for('people.selection_settings', person_id=person.id) }}" class="space-y-4">
           <div>
@@ -432,10 +506,12 @@
             <button class="btn-secondary" type="submit">Save selection settings</button>
           </div>
         </form>
+        </div>
       </div>
 
-      <div class="panel">
-        <h3 class="text-xl font-semibold text-white mb-4">Merge duplicate</h3>
+      <div class="person-detail-card person-detail-card--merge person-detail-card--compact">
+        <div class="panel">
+          <h3 class="text-xl font-semibold text-white mb-4">Merge duplicate</h3>
         <p class="text-sm text-emerald-200/70 mb-4">
           Move this person's events and Arr activity to another person, then delete this duplicate.
         </p>
@@ -462,6 +538,7 @@
 
           <button type="submit" class="btn-danger w-full">Merge into target</button>
         </form>
+        </div>
       </div>
     </div>
   </div>
@@ -469,8 +546,9 @@
 
 
 
-<div class="panel mb-6">
-  <h3 class="text-xl font-semibold text-white mb-4">Events</h3>
+<div class="person-detail-card person-detail-card--events">
+  <div class="panel mb-6">
+    <h3 class="text-xl font-semibold text-white mb-4">Events</h3>
 
   <div class="space-y-4 person-detail-scroll--tall">
     {% for event in person.events|sort(attribute='created_at', reverse=True) %}
@@ -557,6 +635,7 @@
     {% else %}
       <div class="text-sm text-emerald-200/60">No event for this person yet.</div>
     {% endfor %}
+  </div>
   </div>
 </div>
 
@@ -743,8 +822,9 @@
   </div>
 {% endif %}
 
-<div class="panel mb-6">
-  <h3 class="text-xl font-semibold text-white mb-4">Arr activity</h3>
+<div class="person-detail-card person-detail-card--arr">
+  <div class="panel mb-6">
+    <h3 class="text-xl font-semibold text-white mb-4">Arr activity</h3>
 
   <div class="person-detail-scroll--table">
     <table class="w-full text-sm">
@@ -795,6 +875,7 @@
       </tbody>
     </table>
   </div>
+  </div>
 </div>
 
 {% if tmdb_match or tmdb_credits.cast or tmdb_credits.crew %}
@@ -817,7 +898,7 @@
       </form>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+    <div class="grid grid-cols-1 xl:grid-cols-8 gap-6 items-start">
       <div class="min-w-0">
         <h4 class="text-lg font-semibold text-white mb-3">Cast / crew sample</h4>
 

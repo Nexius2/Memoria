@@ -5,6 +5,8 @@ import io
 import json
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, Response
+from sqlalchemy import func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from ..utils.country_utils import normalize_country_label
 from ..services.collection_service import sync_event
@@ -22,6 +24,7 @@ from ..models import (
     ArrServer,
     LibraryTarget,
     PlexServer,
+    CollectionPublication,
     create_or_retrigger_event,
 )
 from ..services.scheduler_service import (
@@ -29,6 +32,7 @@ from ..services.scheduler_service import (
     expire_events,
     enqueue_detection_run,
     enqueue_task_run,
+    enqueue_plex_cache_refresh_for_all_servers,
     recover_stale_detection_runs,
     recover_stale_task_runs,
 )
@@ -216,22 +220,35 @@ def _build_job_history_rows(limit: int = 50) -> list[dict]:
             'details': run.error_message if run.status == 'error' else None,
         })
 
+    plex_servers_by_id = {
+        server.id: server
+        for server in PlexServer.query.all()
+    }
+
     for run in task_runs:
+        job_type = run.task_type
+        summary = (
+            f'{run.processed_items}/{run.total_items} processed · '
+            f'{run.success_items} success · '
+            f'{run.error_items} error'
+        ) if run.status == 'success' else f'{run.task_type.title()} run'
+
+        if run.task_type == 'plex_cache' and run.plex_server_id:
+            plex_server = plex_servers_by_id.get(run.plex_server_id)
+            server_label = plex_server.name if plex_server else f'Server #{run.plex_server_id}'
+            summary = f'{server_label} · {summary}'
+
         rows.append({
             'id': run.id,
             'model': 'task_run',
-            'job_type': run.task_type,
+            'job_type': job_type,
             'status': run.status,
             'requested_by': run.requested_by,
             'created_at': run.created_at,
             'started_at': run.started_at,
             'finished_at': run.finished_at,
             'duration_seconds': _format_run_duration_seconds(run.started_at, run.finished_at),
-            'summary': (
-                f'{run.processed_items}/{run.total_items} processed · '
-                f'{run.success_items} success · '
-                f'{run.error_items} error'
-            ) if run.status == 'success' else f'{run.task_type.title()} run',
+            'summary': summary,
             'details': run.message,
         })
 
@@ -307,6 +324,186 @@ def _build_app_logs_rows(log_rows: list[AppLog]) -> list[dict]:
 
     return rows
 
+def _apply_logs_filters(
+    query,
+    *,
+    level: str,
+    source: str,
+    related_type: str,
+    search: str,
+    date_from_raw: str,
+    date_to_raw: str,
+):
+    normalized_date_from = date_from_raw
+    normalized_date_to = date_to_raw
+
+    if level != 'all':
+        query = query.filter(AppLog.level == level)
+
+    if source != 'all':
+        query = query.filter(AppLog.source == source)
+
+    if related_type != 'all':
+        if related_type == 'none':
+            query = query.filter(
+                or_(AppLog.related_type.is_(None), AppLog.related_type == '')
+            )
+        else:
+            query = query.filter(AppLog.related_type == related_type)
+
+    if search:
+        search_like = f'%{search}%'
+        query = query.filter(
+            or_(
+                AppLog.message.ilike(search_like),
+                AppLog.details.ilike(search_like),
+            )
+        )
+
+    if date_from_raw:
+        try:
+            date_from_value = date.fromisoformat(date_from_raw)
+            query = query.filter(AppLog.created_at >= date_from_value)
+        except ValueError:
+            normalized_date_from = ''
+
+    if date_to_raw:
+        try:
+            date_to_value = date.fromisoformat(date_to_raw) + timedelta(days=1)
+            query = query.filter(AppLog.created_at < date_to_value)
+        except ValueError:
+            normalized_date_to = ''
+
+    return query, normalized_date_from, normalized_date_to
+
+
+def _build_logs_overview(
+    *,
+    level: str,
+    source: str,
+    related_type: str,
+    search: str,
+    date_from_raw: str,
+    date_to_raw: str,
+) -> dict:
+    overview_query = AppLog.query
+
+    overview_query, _, _ = _apply_logs_filters(
+        overview_query,
+        level=level,
+        source=source,
+        related_type=related_type,
+        search=search,
+        date_from_raw=date_from_raw,
+        date_to_raw=date_to_raw,
+    )
+
+    grouped_rows = (
+        overview_query
+        .with_entities(AppLog.level, func.count(AppLog.id))
+        .group_by(AppLog.level)
+        .all()
+    )
+
+    grouped_counts = {row[0]: row[1] for row in grouped_rows}
+
+    return {
+        'info': grouped_counts.get('info', 0),
+        'warning': grouped_counts.get('warning', 0),
+        'error': grouped_counts.get('error', 0),
+        'total': sum(grouped_counts.values()),
+    }
+
+def _apply_logs_filters(
+    query,
+    *,
+    level: str,
+    source: str,
+    related_type: str,
+    search: str,
+    date_from_raw: str,
+    date_to_raw: str,
+):
+    normalized_date_from = date_from_raw
+    normalized_date_to = date_to_raw
+
+    if level != 'all':
+        query = query.filter(AppLog.level == level)
+
+    if source != 'all':
+        query = query.filter(AppLog.source == source)
+
+    if related_type != 'all':
+        if related_type == 'none':
+            query = query.filter(
+                or_(AppLog.related_type.is_(None), AppLog.related_type == '')
+            )
+        else:
+            query = query.filter(AppLog.related_type == related_type)
+
+    if search:
+        search_like = f'%{search}%'
+        query = query.filter(
+            or_(
+                AppLog.message.ilike(search_like),
+                AppLog.details.ilike(search_like),
+            )
+        )
+
+    if date_from_raw:
+        try:
+            date_from_value = date.fromisoformat(date_from_raw)
+            query = query.filter(AppLog.created_at >= date_from_value)
+        except ValueError:
+            normalized_date_from = ''
+
+    if date_to_raw:
+        try:
+            date_to_value = date.fromisoformat(date_to_raw) + timedelta(days=1)
+            query = query.filter(AppLog.created_at < date_to_value)
+        except ValueError:
+            normalized_date_to = ''
+
+    return query, normalized_date_from, normalized_date_to
+
+
+def _build_logs_overview(
+    *,
+    level: str,
+    source: str,
+    related_type: str,
+    search: str,
+    date_from_raw: str,
+    date_to_raw: str,
+) -> dict:
+    overview_query = AppLog.query
+
+    overview_query, _, _ = _apply_logs_filters(
+        overview_query,
+        level=level,
+        source=source,
+        related_type=related_type,
+        search=search,
+        date_from_raw=date_from_raw,
+        date_to_raw=date_to_raw,
+    )
+
+    grouped_rows = (
+        overview_query
+        .with_entities(AppLog.level, func.count(AppLog.id))
+        .group_by(AppLog.level)
+        .all()
+    )
+
+    grouped_counts = {row[0]: row[1] for row in grouped_rows}
+
+    return {
+        'info': grouped_counts.get('info', 0),
+        'warning': grouped_counts.get('warning', 0),
+        'error': grouped_counts.get('error', 0),
+        'total': sum(grouped_counts.values()),
+    }
+
 def _normalize_dashboard_country(value: str | None) -> str | None:
     normalized = normalize_country_label(value)
     if not normalized or normalized in {'—', '-'}:
@@ -319,7 +516,7 @@ def _build_dashboard_overview(settings: AppSettings) -> dict:
         TributeEvent.query
         .options(
             joinedload(TributeEvent.person),
-            joinedload(TributeEvent.publications),
+            joinedload(TributeEvent.publications).joinedload(CollectionPublication.target).joinedload(LibraryTarget.plex_server),
         )
         .all()
     )
@@ -339,6 +536,41 @@ def _build_dashboard_overview(settings: AppSettings) -> dict:
     top_countries = [
         {'name': name, 'count': count}
         for name, count in country_counter.most_common(5)
+    ]
+
+    active_publications = []
+    publication_status_counts = Counter()
+    publication_target_counter = Counter()
+    stale_publications_count = 0
+    zero_media_publications_count = 0
+
+    publication_stale_cutoff = date.today() - timedelta(days=2)
+
+    for event in live_active_events:
+        for publication in (event.publications or []):
+            active_publications.append(publication)
+
+            publication_status = (publication.status or 'pending').strip() or 'pending'
+            publication_status_counts[publication_status] += 1
+
+            if not publication.last_synced_at or publication.last_synced_at.date() < publication_stale_cutoff:
+                stale_publications_count += 1
+
+            if int(publication.media_count or 0) <= 0:
+                zero_media_publications_count += 1
+
+            if publication.target and publication.target.plex_server:
+                target_label = f'{publication.target.plex_server.name} / {publication.target.section_name}'
+            elif publication.target:
+                target_label = publication.target.section_name or f'Target #{publication.target_id}'
+            else:
+                target_label = f'Target #{publication.target_id}'
+
+            publication_target_counter[target_label] += 1
+
+    top_publication_targets = [
+        {'name': name, 'count': count}
+        for name, count in publication_target_counter.most_common(5)
     ]
 
     problematic_events = []
@@ -557,6 +789,17 @@ def _build_dashboard_overview(settings: AppSettings) -> dict:
         'failed_scan_people_count': len(failed_scan_people),
         'excluded_people_count': excluded_people_count,
         'ignored_people_count': ignored_people_count,
+        'publication_overview': {
+            'total': len(active_publications),
+            'synced': publication_status_counts.get('synced', 0),
+            'missing': publication_status_counts.get('missing', 0),
+            'error': publication_status_counts.get('error', 0),
+            'pending': publication_status_counts.get('pending', 0),
+            'removed': publication_status_counts.get('removed', 0),
+            'stale': stale_publications_count,
+            'zero_media': zero_media_publications_count,
+            'top_targets': top_publication_targets,
+        },
     }
 
 def _sort_dashboard_events(events: list[TributeEvent], sort_by: str) -> list[TributeEvent]:
@@ -642,10 +885,13 @@ def dashboard():
             if event.status == 'active' and event.days_remaining <= 7
         ]
     elif view == 'problematic':
+        stale_sync_cutoff = date.today() - timedelta(days=2)
         events = [
             event for event in events
             if event.status == 'active' and (
-                not event.publications or not event.last_synced_at
+                not event.publications
+                or not event.last_synced_at
+                or event.last_synced_at.date() < stale_sync_cutoff
             )
         ]
     elif view == 'published':
@@ -725,6 +971,13 @@ def dashboard():
         .first()
     )
 
+    latest_plex_cache_run = (
+        TaskRun.query
+        .filter_by(task_type='plex_cache')
+        .order_by(TaskRun.created_at.desc())
+        .first()
+    )
+
     return render_template(
         'dashboard.html',
         events=events,
@@ -735,6 +988,7 @@ def dashboard():
         latest_detection_run=latest_detection_run,
         latest_sync_run=latest_sync_run,
         latest_expire_run=latest_expire_run,
+        latest_plex_cache_run=latest_plex_cache_run,
         dashboard_overview=dashboard_overview,
         view=view,
         sort_by=sort_by,
@@ -849,30 +1103,30 @@ def logs():
 
     level = (request.args.get('level') or 'all').strip()
     source = (request.args.get('source') or 'all').strip()
+    related_type = (request.args.get('related_type') or 'all').strip()
+    search = (request.args.get('search') or '').strip()
     date_from_raw = (request.args.get('date_from') or '').strip()
     date_to_raw = (request.args.get('date_to') or '').strip()
 
     query = AppLog.query.order_by(AppLog.created_at.desc(), AppLog.id.desc())
+    query, date_from_raw, date_to_raw = _apply_logs_filters(
+        query,
+        level=level,
+        source=source,
+        related_type=related_type,
+        search=search,
+        date_from_raw=date_from_raw,
+        date_to_raw=date_to_raw,
+    )
 
-    if level != 'all':
-        query = query.filter(AppLog.level == level)
-
-    if source != 'all':
-        query = query.filter(AppLog.source == source)
-
-    if date_from_raw:
-        try:
-            date_from_value = date.fromisoformat(date_from_raw)
-            query = query.filter(AppLog.created_at >= date_from_value)
-        except ValueError:
-            date_from_raw = ''
-
-    if date_to_raw:
-        try:
-            date_to_value = date.fromisoformat(date_to_raw) + timedelta(days=1)
-            query = query.filter(AppLog.created_at < date_to_value)
-        except ValueError:
-            date_to_raw = ''
+    logs_overview = _build_logs_overview(
+        level=level,
+        source=source,
+        related_type=related_type,
+        search=search,
+        date_from_raw=date_from_raw,
+        date_to_raw=date_to_raw,
+    )
 
     total_rows = query.count()
     total_pages = max(1, (total_rows + limit - 1) // limit)
@@ -888,6 +1142,7 @@ def logs():
     return render_template(
         'logs.html',
         log_rows=log_rows,
+        logs_overview=logs_overview,
         limit=limit,
         page=page,
         total_pages=total_pages,
@@ -898,6 +1153,8 @@ def logs():
         next_page=(page + 1),
         level=level,
         source=source,
+        related_type=related_type,
+        search=search,
         date_from=date_from_raw,
         date_to=date_to_raw,
     )
@@ -906,30 +1163,21 @@ def logs():
 def export_logs():
     level = (request.args.get('level') or 'all').strip()
     source = (request.args.get('source') or 'all').strip()
+    related_type = (request.args.get('related_type') or 'all').strip()
+    search = (request.args.get('search') or '').strip()
     date_from_raw = (request.args.get('date_from') or '').strip()
     date_to_raw = (request.args.get('date_to') or '').strip()
 
     query = AppLog.query.order_by(AppLog.created_at.desc(), AppLog.id.desc())
-
-    if level != 'all':
-        query = query.filter(AppLog.level == level)
-
-    if source != 'all':
-        query = query.filter(AppLog.source == source)
-
-    if date_from_raw:
-        try:
-            date_from_value = date.fromisoformat(date_from_raw)
-            query = query.filter(AppLog.created_at >= date_from_value)
-        except ValueError:
-            date_from_raw = ''
-
-    if date_to_raw:
-        try:
-            date_to_value = date.fromisoformat(date_to_raw) + timedelta(days=1)
-            query = query.filter(AppLog.created_at < date_to_value)
-        except ValueError:
-            date_to_raw = ''
+    query, date_from_raw, date_to_raw = _apply_logs_filters(
+        query,
+        level=level,
+        source=source,
+        related_type=related_type,
+        search=search,
+        date_from_raw=date_from_raw,
+        date_to_raw=date_to_raw,
+    )
 
     raw_log_rows = query.all()
     log_rows = _build_app_logs_rows(raw_log_rows)
@@ -1031,9 +1279,9 @@ def background_jobs_status():
         .order_by(TaskRun.created_at.desc())
         .first()
     )
-    expire_run = (
+    plex_cache_run = (
         TaskRun.query
-        .filter_by(task_type='expire')
+        .filter_by(task_type='plex_cache')
         .order_by(TaskRun.created_at.desc())
         .first()
     )
@@ -1090,6 +1338,7 @@ def background_jobs_status():
         'detection': serialize_detection(detection_run),
         'sync': serialize_task(sync_run, 'No sync job yet.'),
         'expire': serialize_task(expire_run, 'No expire job yet.'),
+        'plex_cache': serialize_task(plex_cache_run, 'No Plex cache refresh yet.'),
     })
 
 @bp.post('/actions/candidate/<int:candidate_id>/ensure-person')
@@ -1201,5 +1450,27 @@ def run_expire():
         flash('Expire check started in background.', 'success')
     else:
         flash('An expire job is already running.', 'warning')
+
+    return redirect(url_for('main.dashboard'))
+
+@bp.post('/actions/run-plex-cache-refresh')
+def run_plex_cache_refresh():
+    result = enqueue_plex_cache_refresh_for_all_servers(
+        current_app._get_current_object(),
+        'manual',
+    )
+
+    created_count = int(result.get('created_count') or 0)
+    skipped_count = int(result.get('skipped_count') or 0)
+    total_servers = int(result.get('total_servers') or 0)
+
+    if created_count > 0:
+        flash(
+            f'Plex cache refresh started for {created_count}/{total_servers} server(s).'
+            + (f' {skipped_count} already running.' if skipped_count > 0 else ''),
+            'success',
+        )
+    else:
+        flash('All Plex cache jobs are already running.', 'warning')
 
     return redirect(url_for('main.dashboard'))

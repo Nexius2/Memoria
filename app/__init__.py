@@ -7,6 +7,7 @@ from sqlalchemy import inspect, text
 
 from .extensions import db, scheduler
 from .models import AppSettings
+from .utils.i18n import translate, get_current_language, get_available_languages
 
 def _read_info_version() -> str | None:
     info_path = Path(__file__).resolve().parent.parent / 'INFO'
@@ -42,6 +43,11 @@ def _ensure_runtime_schema():
 
     alter_statements: list[str] = []
 
+    if 'ui_language' not in existing_columns:
+        alter_statements.append(
+            "ALTER TABLE app_settings ADD COLUMN ui_language VARCHAR(10) NOT NULL DEFAULT 'auto'"
+        )
+
     if 'log_retention_days' not in existing_columns:
         alter_statements.append(
             "ALTER TABLE app_settings ADD COLUMN log_retention_days INTEGER NOT NULL DEFAULT 30"
@@ -75,6 +81,21 @@ def _ensure_runtime_schema():
     if 'min_people_priority_display' not in existing_columns:
         alter_statements.append(
             "ALTER TABLE app_settings ADD COLUMN min_people_priority_display INTEGER NOT NULL DEFAULT 25"
+        )
+
+    if 'auto_backup_enabled' not in existing_columns:
+        alter_statements.append(
+            "ALTER TABLE app_settings ADD COLUMN auto_backup_enabled BOOLEAN NOT NULL DEFAULT 1"
+        )
+
+    if 'backup_interval_hours' not in existing_columns:
+        alter_statements.append(
+            "ALTER TABLE app_settings ADD COLUMN backup_interval_hours INTEGER NOT NULL DEFAULT 24"
+        )
+
+    if 'backup_retention_count' not in existing_columns:
+        alter_statements.append(
+            "ALTER TABLE app_settings ADD COLUMN backup_retention_count INTEGER NOT NULL DEFAULT 14"
         )
 
     if 'person' in table_names:
@@ -149,6 +170,17 @@ def _ensure_runtime_schema():
                 "ALTER TABLE library_target ADD COLUMN plex_titles_cache_error TEXT"
             )
 
+    if 'task_run' in table_names:
+        task_run_columns = {
+            column['name']
+            for column in inspector.get_columns('task_run')
+        }
+
+        if 'plex_server_id' not in task_run_columns:
+            alter_statements.append(
+                "ALTER TABLE task_run ADD COLUMN plex_server_id INTEGER"
+            )
+
     if not alter_statements:
         return
 
@@ -207,6 +239,9 @@ def create_app():
             'arr_servers': ArrServer.query.order_by(ArrServer.name.asc()).all(),
             'library_targets': LibraryTarget.query.order_by(LibraryTarget.section_name.asc()).all(),
             'app_version': _read_info_version(),
+            't': translate,
+            'current_language': get_current_language(),
+            'available_languages': get_available_languages(),
         }
 
     with app.app_context():

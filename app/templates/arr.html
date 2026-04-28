@@ -494,9 +494,12 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-8 text-center text-emerald-200/60">
-        No Arr server configured yet.
-      </div>
+      {% set empty_state_icon = '🛰' %}
+      {% set empty_state_title = 'No Arr server configured yet' %}
+      {% set empty_state_message = 'Add at least one Radarr or Sonarr server to let Memoria send missing titles automatically and track recent Arr activity.' %}
+      {% set empty_state_action_url = url_for('settings.index') %}
+      {% set empty_state_action_label = 'Open settings' %}
+      {% include '_empty_state.html' %}
     {% endif %}
   </div>
 
@@ -614,8 +617,13 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="9" class="py-6 text-center text-emerald-200/60">
-              No Arr activity found for the current filters.
+            <td colspan="9" class="py-6">
+              {% set empty_state_icon = '📭' %}
+              {% set empty_state_title = 'No Arr activity found' %}
+              {% set empty_state_message = 'No send history matches the current filters. Either nothing has been sent yet, or the selected server / status / type filters are hiding the existing activity.' %}
+              {% set empty_state_action_url = url_for('arr.missing_titles') %}
+              {% set empty_state_action_label = 'Open missing titles' %}
+              {% include '_empty_state.html' %}
             </td>
           </tr>
         {% endfor %}

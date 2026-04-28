@@ -363,8 +363,13 @@
           </tr>
         {% else %}
           <tr>
-            <td colspan="11" class="py-6 text-center text-emerald-200/60">
-              No missing title found for the current filters.
+            <td colspan="11" class="py-6">
+              {% set empty_state_icon = '🎬' if media_kind_filter == 'movie' else '📺' if media_kind_filter == 'show' else '🎞' %}
+              {% set empty_state_title = 'No missing title found' %}
+              {% set empty_state_message = 'Nothing matches the current filters. This can mean your backlog is clean, or simply that the selected source / country / Arr readiness filters are too restrictive.' %}
+              {% set empty_state_action_url = url_for('arr.missing_titles') %}
+              {% set empty_state_action_label = 'Reset filters' %}
+              {% include '_empty_state.html' %}
             </td>
           </tr>
         {% endfor %}

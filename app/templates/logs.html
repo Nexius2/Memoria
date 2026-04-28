@@ -1,41 +1,45 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="panel mb-6">
-  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-    <div>
-      <h2 class="text-2xl font-semibold text-white section-title-with-icon">
-        <span class="section-title-icon">≣</span>
-        <span>Application logs</span>
-      </h2>
-      <p class="text-sm text-emerald-200/70 mt-1">
-        Review background job activity and runtime errors.
-      </p>
-    </div>
-
-	<div class="text-xs text-emerald-200/60">
-	  {{ log_rows|length }} row{{ 's' if log_rows|length != 1 else '' }} shown
-	  {% if total_rows is defined %}
-		· {{ total_rows }} total
-	  {% endif %}
-	</div>
-  </div>
-</div>
 
 <div class="panel">
-  <form method="get" action="{{ url_for('main.logs') }}" class="filter-toolbar">
-    <div class="filter-toolbar-header">
-      <div>
-        <div class="filter-toolbar-title">Filters</div>
-        <div class="filter-toolbar-subtitle">Use filters for view changes. Keep export as a separate data action.</div>
-      </div>
-      <div class="filter-toolbar-meta">
-        Current page: {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
-      </div>
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+    <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
+      <div class="label">Info</div>
+      <div class="value text-2xl">{{ logs_overview.info }}</div>
     </div>
 
-    <div class="filter-toolbar-grid cols-6">
-      <div>
+    <div class="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-4">
+      <div class="label">Warnings</div>
+      <div class="value text-2xl">{{ logs_overview.warning }}</div>
+    </div>
+
+    <div class="rounded-2xl border border-rose-400/15 bg-rose-500/10 p-4">
+      <div class="label">Errors</div>
+      <div class="value text-2xl">{{ logs_overview.error }}</div>
+    </div>
+
+    <div class="rounded-2xl border border-sky-400/15 bg-sky-500/10 p-4">
+      <div class="label">Filtered total</div>
+      <div class="value text-2xl">{{ logs_overview.total }}</div>
+    </div>
+  </div>
+
+<form method="get" action="{{ url_for('main.logs') }}" class="filter-toolbar filter-toolbar--compact">
+  <div class="filter-toolbar-header">
+    <div>
+      <div class="filter-toolbar-title">Filters</div>
+      <div class="filter-toolbar-subtitle">Search text, narrow quickly by level and date, then open advanced filters only when needed.</div>
+    </div>
+    <div class="filter-toolbar-meta">
+      {{ log_rows|length }} rows shown{% if total_rows is defined %} · {{ total_rows }} total{% endif %}<br>
+      Current page: {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
+    </div>
+  </div>
+
+  <div class="logs-filter-shell">
+    <div class="logs-filter-primary">
+      <div class="logs-filter-item logs-filter-item--level">
         <label class="field-label">Level</label>
         <select class="field" name="level">
           <option value="all" {% if level == 'all' %}selected{% endif %}>All</option>
@@ -45,53 +49,96 @@
         </select>
       </div>
 
-      <div>
-        <label class="field-label">Source</label>
-        <select class="field" name="source">
-          <option value="all" {% if source == 'all' %}selected{% endif %}>All</option>
-          <option value="detection" {% if source == 'detection' %}selected{% endif %}>Detection</option>
-          <option value="sync" {% if source == 'sync' %}selected{% endif %}>Sync</option>
-          <option value="expire" {% if source == 'expire' %}selected{% endif %}>Expire</option>
-          <option value="cleanup" {% if source == 'cleanup' %}selected{% endif %}>Cleanup</option>
-          <option value="scheduler" {% if source == 'scheduler' %}selected{% endif %}>Scheduler</option>
-          <option value="arr" {% if source == 'arr' %}selected{% endif %}>Arr</option>
-        </select>
+      <div class="logs-filter-item logs-filter-item--search">
+        <label class="field-label">Search</label>
+        <input
+          type="text"
+          class="field"
+          name="search"
+          value="{{ search }}"
+          placeholder="message or details"
+        >
       </div>
 
-      <div>
+      <div class="logs-filter-item logs-filter-item--date">
         <label class="field-label">From</label>
         <input type="date" class="field" name="date_from" value="{{ date_from }}">
       </div>
 
-      <div>
+      <div class="logs-filter-item logs-filter-item--date">
         <label class="field-label">To</label>
         <input type="date" class="field" name="date_to" value="{{ date_to }}">
       </div>
 
-      <div>
-        <label class="field-label">Limit</label>
-        <select class="field" name="limit">
-          <option value="20" {% if limit == 20 %}selected{% endif %}>20</option>
-          <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
-          <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
-          <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
-          <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
-        </select>
-      </div>
-
-      <div class="filter-toolbar-actions">
+      <div class="logs-filter-actions">
         <button type="submit" class="btn-primary">Apply</button>
         <a href="{{ url_for('main.logs') }}" class="btn-secondary">Reset</a>
-        <a
-          href="{{ url_for('main.export_logs', level=level, source=source, date_from=date_from, date_to=date_to) }}"
-          class="btn-secondary"
-        >
-          <span class="btn-icon">↓</span>
-          <span>Export CSV</span>
-        </a>
       </div>
     </div>
-  </form>
+
+    <details
+      class="logs-filter-advanced"
+      {% if source != 'all' or related_type != 'all' or limit != 20 %}open{% endif %}
+    >
+      <summary class="btn-secondary logs-filter-advanced-toggle">Advanced</summary>
+
+      <div class="logs-filter-advanced-panel">
+        <div class="logs-filter-advanced-grid">
+          <div>
+            <label class="field-label">Source</label>
+            <select class="field" name="source">
+              <option value="all" {% if source == 'all' %}selected{% endif %}>All</option>
+              <option value="detection" {% if source == 'detection' %}selected{% endif %}>Detection</option>
+              <option value="sync" {% if source == 'sync' %}selected{% endif %}>Sync</option>
+              <option value="expire" {% if source == 'expire' %}selected{% endif %}>Expire</option>
+              <option value="cleanup" {% if source == 'cleanup' %}selected{% endif %}>Cleanup</option>
+              <option value="scheduler" {% if source == 'scheduler' %}selected{% endif %}>Scheduler</option>
+              <option value="arr" {% if source == 'arr' %}selected{% endif %}>Arr</option>
+              <option value="tmdb" {% if source == 'tmdb' %}selected{% endif %}>TMDb</option>
+              <option value="people" {% if source == 'people' %}selected{% endif %}>People</option>
+              <option value="collections" {% if source == 'collections' %}selected{% endif %}>Collections</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label">Related</label>
+            <select class="field" name="related_type">
+              <option value="all" {% if related_type == 'all' %}selected{% endif %}>All</option>
+              <option value="person" {% if related_type == 'person' %}selected{% endif %}>Person</option>
+              <option value="event" {% if related_type == 'event' %}selected{% endif %}>Event</option>
+              <option value="task_run" {% if related_type == 'task_run' %}selected{% endif %}>Task run</option>
+              <option value="detection_run" {% if related_type == 'detection_run' %}selected{% endif %}>Detection run</option>
+              <option value="arr_activity" {% if related_type == 'arr_activity' %}selected{% endif %}>Arr activity</option>
+              <option value="server" {% if related_type == 'server' %}selected{% endif %}>Server</option>
+              <option value="none" {% if related_type == 'none' %}selected{% endif %}>No related object</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label">Limit</label>
+            <select class="field" name="limit">
+              <option value="20" {% if limit == 20 %}selected{% endif %}>20</option>
+              <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+              <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+              <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+              <option value="200" {% if limit == 200 %}selected{% endif %}>200</option>
+            </select>
+          </div>
+
+          <div class="logs-filter-advanced-actions">
+            <a
+              href="{{ url_for('main.export_logs', level=level, source=source, related_type=related_type, search=search, date_from=date_from, date_to=date_to, limit=limit) }}"
+              class="btn-secondary"
+            >
+              <span class="btn-icon">↓</span>
+              <span>Export CSV</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
+</form>
 
   <div class="space-y-3">
     {% for row in log_rows %}
@@ -164,9 +211,12 @@
         </div>
       </div>
     {% else %}
-      <div class="py-8 text-center text-emerald-200/60">
-        No logs found for the current filters.
-      </div>
+      {% set empty_state_icon = '🧾' %}
+      {% set empty_state_title = 'No logs found' %}
+      {% set empty_state_message = 'No log matches the current filters. Try broadening the date range, clearing the source filter, or waiting for a new action to generate fresh entries.' %}
+      {% set empty_state_action_url = url_for('main.logs') %}
+      {% set empty_state_action_label = 'Reset filters' %}
+      {% include '_empty_state.html' %}
     {% endfor %}
   </div>
 
@@ -178,7 +228,7 @@
     <div class="flex items-center gap-2">
       {% if has_prev %}
         <a
-          href="{{ url_for('main.logs', page=prev_page, limit=limit, level=level, source=source, date_from=date_from, date_to=date_to) }}"
+          href="{{ url_for('main.logs', page=prev_page, limit=limit, level=level, source=source, related_type=related_type, search=search, date_from=date_from, date_to=date_to) }}"
           class="btn-secondary"
         >
           Previous
@@ -189,7 +239,7 @@
 
       {% if has_next %}
         <a
-          href="{{ url_for('main.logs', page=next_page, limit=limit, level=level, source=source, date_from=date_from, date_to=date_to) }}"
+          href="{{ url_for('main.logs', page=next_page, limit=limit, level=level, source=source, related_type=related_type, search=search, date_from=date_from, date_to=date_to) }}"
           class="btn-secondary"
         >
           Next

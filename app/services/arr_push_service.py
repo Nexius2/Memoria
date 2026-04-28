@@ -97,7 +97,8 @@ def _already_handled(
     person_id: int,
     target_id: int,
     media_kind: str,
-    external_id: int | None,
+    tmdb_id: int | None,
+    tvdb_id: int | None,
     title: str,
     year: int | None,
 ) -> bool:
@@ -107,14 +108,20 @@ def _already_handled(
         ArrActivity.media_kind == media_kind,
     )
 
-    if external_id:
-        query = query.filter(
-            or_(
-                ArrActivity.tmdb_id == external_id,
-                ArrActivity.tvdb_id == external_id,
-                ArrActivity.external_id == external_id,
-            )
-        )
+    external_filters = []
+    if tmdb_id:
+        external_filters.extend([
+            ArrActivity.tmdb_id == tmdb_id,
+            ArrActivity.external_id == tmdb_id,
+        ])
+    if tvdb_id:
+        external_filters.extend([
+            ArrActivity.tvdb_id == tvdb_id,
+            ArrActivity.external_id == tvdb_id,
+        ])
+
+    if external_filters:
+        query = query.filter(or_(*external_filters))
     else:
         query = query.filter(
             ArrActivity.title == title,
@@ -277,8 +284,15 @@ def push_missing_titles_for_person(
             skipped_items += 1
             continue
 
-        external_id = item.get('id')
-        title = item.get('title') or item.get('name') or ''
+        tmdb_id = item.get('id')
+        tvdb_id = item.get('tvdb_id')
+        title = (
+            item.get('title')
+            or item.get('name')
+            or item.get('original_title')
+            or item.get('original_name')
+            or ''
+        )
         raw_year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
         year = int(raw_year) if raw_year.isdigit() else None
 
@@ -291,7 +305,8 @@ def push_missing_titles_for_person(
                 person_id=person.id,
                 target_id=target.id,
                 media_kind=media_kind,
-                external_id=external_id,
+                tmdb_id=tmdb_id,
+                tvdb_id=tvdb_id,
                 title=title,
                 year=year,
             ):
@@ -304,14 +319,14 @@ def push_missing_titles_for_person(
             if media_kind == 'movie':
                 result = service.ensure_movie(
                     title=title,
-                    tmdb_id=external_id,
+                    tmdb_id=tmdb_id,
                     year=year,
                 )
             else:
                 result = service.ensure_series(
                     title=title,
-                    tvdb_id=None,
-                    tmdb_id=external_id,
+                    tvdb_id=tvdb_id,
+                    tmdb_id=tmdb_id,
                     year=year,
                 )
 
@@ -319,7 +334,7 @@ def push_missing_titles_for_person(
                 person=person,
                 target=target,
                 media_kind=media_kind,
-                external_id=external_id,
+                external_id=tvdb_id or tmdb_id,
                 title=title,
                 year=year,
                 result=result,

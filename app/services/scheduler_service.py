@@ -22,16 +22,20 @@ from ..services.detection_service import DetectionService
 from ..utils.person_duplicates import find_existing_person_duplicate
 from ..services.collection_service import sync_event, expire_due_events, remove_event_collections
 from ..services.missing_titles_service import refresh_person_missing_titles, is_missing_titles_refresh_due
-from ..services.plex_library_cache_service import refresh_library_title_cache_safe, is_library_cache_due
+from ..services.plex_library_cache_service import is_library_cache_due
+from ..services.plex_local_index_service import refresh_library_local_index_safe
 from ..services.arr_push_service import (
     push_active_events_missing_to_arr,
     push_missing_titles_for_active_person_events,
 )
+from ..services.backup_service import run_automatic_backup
 from ..blueprints.servers import sync_server_libraries
 _DETECTION_RUN_LOCK = Lock()
 _SYNC_TASK_LOCK = Lock()
 _EXPIRE_TASK_LOCK = Lock()
 _CLEANUP_TASK_LOCK = Lock()
+_PLEX_CACHE_SERVER_LOCKS_GUARD = Lock()
+_PLEX_CACHE_SERVER_LOCKS: dict[int, Lock] = {}
 
 _STARTUP_DETECTION_COOLDOWN_MINUTES = 30
 _STARTUP_TASK_COOLDOWN_MINUTES = 30
@@ -65,14 +69,14 @@ def register_jobs(app):
     scheduler.add_job(
         func=lambda: _run_in_app(app, discover_libraries_daily),
         trigger='interval',
-        hours=24,
+        hours=12,
         id='discover_libraries_daily',
         replace_existing=True,
     )
     scheduler.add_job(
-        func=lambda: _run_in_app(app, refresh_plex_library_caches),
+        func=lambda: _run_in_app(app, enqueue_plex_cache_refresh_for_all_servers, app, 'auto'),
         trigger='interval',
-        hours=24,
+        hours=12,
         id='refresh_plex_library_caches',
         replace_existing=True,
     )
@@ -118,7 +122,14 @@ def register_jobs(app):
         id='push_active_events_missing_to_arr',
         replace_existing=True,
     )
-
+    scheduler.add_job(
+        func=lambda: _run_in_app(app, run_scheduled_backup),
+        trigger='interval',
+        hours=1,
+        id='run_scheduled_backup',
+        replace_existing=True,
+    )
+    
 def schedule_startup_catchup(app) -> None:
     if scheduler.get_job('startup_catchup'):
         return
@@ -144,7 +155,7 @@ def run_startup_catchup(app) -> None:
     recover_stale_task_runs()
 
     try:
-        refresh_plex_library_caches()
+        enqueue_plex_cache_refresh_for_all_servers(app, 'startup')
     except Exception as exc:
         current_app.logger.exception('Startup catch-up failed during Plex library cache refresh.')
         log_app_event(
@@ -239,6 +250,46 @@ def _run_in_app(app, fn, *args, **kwargs):
     with app.app_context():
         fn(*args, **kwargs)
 
+def _plex_cache_lock_for_server(plex_server_id: int) -> Lock:
+    with _PLEX_CACHE_SERVER_LOCKS_GUARD:
+        lock = _PLEX_CACHE_SERVER_LOCKS.get(plex_server_id)
+        if lock is None:
+            lock = Lock()
+            _PLEX_CACHE_SERVER_LOCKS[plex_server_id] = lock
+        return lock
+
+def run_scheduled_backup() -> None:
+    settings = AppSettings.get_or_create()
+
+    if not settings.auto_backup_enabled:
+        return
+
+    try:
+        result = run_automatic_backup(
+            interval_hours=settings.backup_interval_hours,
+            retention_count=settings.backup_retention_count,
+        )
+
+        if result['created']:
+            log_app_event(
+                'info',
+                'backup',
+                'Automatic database backup created.',
+                details=result['backup_path'],
+                related_type='backup',
+                related_id=None,
+            )
+    except Exception as exc:
+        current_app.logger.exception('Automatic database backup failed.')
+        log_app_event(
+            'error',
+            'backup',
+            'Automatic database backup failed.',
+            details=str(exc),
+            related_type='backup',
+            related_id=None,
+        )
+
 def _was_finished_recently(finished_at: datetime | None, cooldown_minutes: int) -> bool:
     if not finished_at:
         return False
@@ -295,39 +346,106 @@ def _log_startup_catchup_skip(job_name: str, reason: str) -> None:
         details=reason,
     )
 
-def refresh_plex_library_caches(task_run_id: int | None = None) -> dict:
+def refresh_plex_server_library_caches(
+    plex_server_id: int,
+    task_run_id: int | None = None,
+    force: bool = False,
+) -> dict:
+    plex_server = PlexServer.query.get(plex_server_id)
+    if not plex_server or not plex_server.enabled:
+        return {
+            'total_items': 0,
+            'processed_items': 0,
+            'success_items': 0,
+            'error_items': 0,
+            'message': f'Plex server #{plex_server_id} is missing or disabled.',
+        }
+
     targets = (
         LibraryTarget.query
-        .join(PlexServer, LibraryTarget.plex_server_id == PlexServer.id)
         .filter(
+            LibraryTarget.plex_server_id == plex_server_id,
             LibraryTarget.enabled.is_(True),
-            PlexServer.enabled.is_(True),
         )
+        .order_by(LibraryTarget.section_name.asc(), LibraryTarget.id.asc())
         .all()
     )
 
-    total_items = len(targets)
+    due_targets = []
+    for target in targets:
+        if force or is_library_cache_due(target, 12):
+            due_targets.append(target)
+
+    total_items = len(due_targets)
     processed_items = 0
     success_items = 0
     error_items = 0
 
-    for target in targets:
-        if not is_library_cache_due(target, 24):
-            continue
+    if task_run_id:
+        _update_task_run_progress(
+            task_run_id,
+            total_items=total_items,
+            processed_items=0,
+            success_items=0,
+            error_items=0,
+            message=f'Plex cache queued for {plex_server.name}.',
+        )
 
+    for target in due_targets:
         processed_items += 1
-        refresh_library_title_cache_safe(target)
+
+        if task_run_id:
+            _update_task_run_progress(
+                task_run_id,
+                total_items=total_items,
+                processed_items=processed_items - 1,
+                success_items=success_items,
+                error_items=error_items,
+                message=f'Refreshing {plex_server.name} / {target.section_name}...',
+            )
+
+        local_index_result = refresh_library_local_index_safe(
+            target,
+            task_run_id=task_run_id,
+            progress_callback=(
+                lambda **progress: _update_task_run_progress(
+                    task_run_id,
+                    total_items=total_items,
+                    processed_items=processed_items - 1,
+                    success_items=success_items,
+                    error_items=error_items,
+                    message=progress.get('message'),
+                )
+            ) if task_run_id else None,
+        )
 
         db.session.expire_all()
         refreshed_target = LibraryTarget.query.get(target.id)
 
-        if refreshed_target and refreshed_target.plex_titles_cache_status == 'ready':
+        if (
+            refreshed_target
+            and refreshed_target.plex_titles_cache_status == 'ready'
+            and local_index_result.get('status') == 'ready'
+        ):
             success_items += 1
         else:
             error_items += 1
 
+        if task_run_id:
+            _update_task_run_progress(
+                task_run_id,
+                total_items=total_items,
+                processed_items=processed_items,
+                success_items=success_items,
+                error_items=error_items,
+                message=(
+                    f'{plex_server.name}: {processed_items}/{total_items} library(ies), '
+                    f'{success_items} success, {error_items} error.'
+                ),
+            )
+
     message = (
-        f'Plex library cache refresh finished. '
+        f'Plex cache refresh finished for {plex_server.name}. '
         f'{processed_items} libraries refreshed, {success_items} success, {error_items} error.'
     )
 
@@ -344,6 +462,56 @@ def refresh_plex_library_caches(task_run_id: int | None = None) -> dict:
         'success_items': success_items,
         'error_items': error_items,
         'message': message,
+    }
+
+
+def refresh_plex_server_library_caches_now(
+    plex_server_id: int,
+    task_run_id: int | None = None,
+) -> dict:
+    return refresh_plex_server_library_caches(
+        plex_server_id=plex_server_id,
+        task_run_id=task_run_id,
+        force=True,
+    )
+
+
+def enqueue_plex_cache_refresh_for_all_servers(
+    app,
+    requested_by: str = 'manual',
+) -> dict:
+    plex_servers = (
+        PlexServer.query
+        .join(LibraryTarget, LibraryTarget.plex_server_id == PlexServer.id)
+        .filter(
+            PlexServer.enabled.is_(True),
+            LibraryTarget.enabled.is_(True),
+        )
+        .distinct()
+        .order_by(PlexServer.name.asc(), PlexServer.id.asc())
+        .all()
+    )
+
+    total_servers = len(plex_servers)
+    created_count = 0
+    skipped_count = 0
+
+    for plex_server in plex_servers:
+        _, created = enqueue_task_run(
+            app,
+            'plex_cache',
+            requested_by=requested_by,
+            plex_server_id=plex_server.id,
+        )
+        if created:
+            created_count += 1
+        else:
+            skipped_count += 1
+
+    return {
+        'total_servers': total_servers,
+        'created_count': created_count,
+        'skipped_count': skipped_count,
     }
 
 def refresh_missing_titles_cache(task_run_id: int | None = None) -> dict:
@@ -423,7 +591,7 @@ def refresh_missing_titles_cache(task_run_id: int | None = None) -> dict:
         'message': message,
     }
 
-def recover_stale_detection_runs(max_age_minutes: int = 10) -> int:
+def recover_stale_detection_runs(max_age_minutes: int = 30) -> int:
     cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
 
     stale_runs = (
@@ -465,8 +633,6 @@ def recover_stale_detection_runs(max_age_minutes: int = 10) -> int:
     return updated
 
 def recover_stale_task_runs(max_age_minutes: int = 60) -> int:
-    cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
-
     stale_runs = (
         TaskRun.query
         .filter(TaskRun.status.in_(['pending', 'running']))
@@ -479,6 +645,9 @@ def recover_stale_task_runs(max_age_minutes: int = 60) -> int:
         reference_time = run.started_at or run.created_at
         if not reference_time:
             continue
+
+        timeout_minutes = _task_stale_timeout_minutes(run.task_type)
+        cutoff = datetime.utcnow() - timedelta(minutes=timeout_minutes)
 
         if reference_time >= cutoff:
             continue
@@ -506,13 +675,17 @@ def recover_stale_task_runs(max_age_minutes: int = 60) -> int:
     return updated
 
 
-def _task_lock_for(task_type: str) -> Lock:
+def _task_lock_for(task_type: str, plex_server_id: int | None = None) -> Lock:
     if task_type == 'sync':
         return _SYNC_TASK_LOCK
     if task_type == 'expire':
         return _EXPIRE_TASK_LOCK
     if task_type == 'cleanup':
         return _CLEANUP_TASK_LOCK
+    if task_type == 'plex_cache':
+        if plex_server_id is None:
+            raise ValueError('plex_server_id is required for plex_cache tasks')
+        return _plex_cache_lock_for_server(plex_server_id)
     raise ValueError(f'Unsupported task type: {task_type}')
 
 
@@ -523,6 +696,8 @@ def _task_runner_for(task_type: str):
         return expire_events
     if task_type == 'cleanup':
         return cleanup_history
+    if task_type == 'plex_cache':
+        return refresh_plex_server_library_caches
     raise ValueError(f'Unsupported task type: {task_type}')
 
 
@@ -553,12 +728,79 @@ def _update_task_run_progress(
     db.session.commit()
 
 
-def enqueue_task_run(app, task_type: str, requested_by: str = 'manual') -> tuple[TaskRun, bool]:
+def _task_stale_timeout_minutes(task_type: str) -> int:
+    if task_type == 'plex_cache':
+        return 180
+    return 60
+
+
+def enqueue_task_run(
+    app,
+    task_type: str,
+    requested_by: str = 'manual',
+    plex_server_id: int | None = None,
+) -> tuple[TaskRun, bool]:
+    recover_stale_task_runs()
+
+    if task_type == 'plex_cache':
+        if plex_server_id is None:
+            raise ValueError('plex_server_id is required for plex_cache tasks')
+
+        existing = (
+            TaskRun.query
+            .filter(
+                TaskRun.task_type == task_type,
+                TaskRun.plex_server_id == plex_server_id,
+                TaskRun.status.in_(['pending', 'running']),
+            )
+            .order_by(TaskRun.created_at.desc())
+            .first()
+        )
+
+        plex_server = PlexServer.query.get(plex_server_id)
+        server_label = plex_server.name if plex_server else f'Server #{plex_server_id}'
+
+        if existing:
+            log_app_event(
+                'warning',
+                task_type,
+                f'Plex cache job request ignored because another job is already running for {server_label}.',
+                related_type='task_run',
+                related_id=existing.id,
+            )
+            return existing, False
+
+        run = TaskRun(
+            task_type=task_type,
+            status='pending',
+            requested_by=requested_by,
+            plex_server_id=plex_server_id,
+        )
+        db.session.add(run)
+        db.session.commit()
+
+        scheduler.add_job(
+            func=lambda run_id=run.id: _run_in_app(app, execute_task_run, run_id),
+            trigger='date',
+            run_date=datetime.now(scheduler.timezone) + timedelta(seconds=1),
+            id=f'task_run_{task_type}_{plex_server_id}_{run.id}',
+            replace_existing=True,
+            misfire_grace_time=30,
+        )
+
+        log_app_event(
+            'info',
+            task_type,
+            f'Plex cache job queued for {server_label}.',
+            related_type='task_run',
+            related_id=run.id,
+        )
+
+        return run, True
+
     lock = _task_lock_for(task_type)
 
     with lock:
-        recover_stale_task_runs()
-
         existing = (
             TaskRun.query
             .filter(
@@ -611,19 +853,28 @@ def execute_task_run(run_id: int) -> None:
     if not run:
         return
 
-    lock = _task_lock_for(run.task_type)
+    lock = _task_lock_for(run.task_type, run.plex_server_id)
     acquired = lock.acquire(blocking=False)
 
     if not acquired:
         if run.status in ['pending', 'running']:
             run.status = 'error'
             run.finished_at = datetime.utcnow()
-            run.message = f'Another {run.task_type} job is already running.'
+
+            if run.task_type == 'plex_cache' and run.plex_server_id:
+                plex_server = PlexServer.query.get(run.plex_server_id)
+                server_label = plex_server.name if plex_server else f'Server #{run.plex_server_id}'
+                run.message = f'Another plex cache job is already running for {server_label}.'
+                log_message = f'Plex cache job failed to start because another job is already running for {server_label}.'
+            else:
+                run.message = f'Another {run.task_type} job is already running.'
+                log_message = f'{run.task_type.title()} job failed to start because another job is already running.'
+
             db.session.commit()
             log_app_event(
                 'error',
                 run.task_type,
-                f'{run.task_type.title()} job failed to start because another job is already running.',
+                log_message,
                 related_type='task_run',
                 related_id=run.id,
             )
@@ -647,17 +898,32 @@ def execute_task_run(run_id: int) -> None:
         run.error_items = 0
         db.session.commit()
 
+        if run.task_type == 'plex_cache' and run.plex_server_id:
+            plex_server = PlexServer.query.get(run.plex_server_id)
+            server_label = plex_server.name if plex_server else f'Server #{run.plex_server_id}'
+            started_message = f'Plex cache job started for {server_label}.'
+        else:
+            started_message = f'{run.task_type.title()} job started.'
+
         log_app_event(
             'info',
             run.task_type,
-            f'{run.task_type.title()} job started.',
+            started_message,
             related_type='task_run',
             related_id=run.id,
         )
 
         try:
             runner = _task_runner_for(run.task_type)
-            result = runner(task_run_id=run.id)
+
+            if run.task_type == 'plex_cache':
+                result = runner(
+                    plex_server_id=run.plex_server_id,
+                    task_run_id=run.id,
+                    force=(run.requested_by != 'auto'),
+                )
+            else:
+                result = runner(task_run_id=run.id)
 
             run = TaskRun.query.get(run_id)
             if run:
@@ -673,7 +939,11 @@ def execute_task_run(run_id: int) -> None:
                 log_app_event(
                     'info',
                     run.task_type,
-                    f'{run.task_type.title()} job finished successfully.',
+                    (
+                        f'Plex cache job finished successfully.'
+                        if run.task_type == 'plex_cache'
+                        else f'{run.task_type.title()} job finished successfully.'
+                    ),
                     details=run.message,
                     related_type='task_run',
                     related_id=run.id,
@@ -692,7 +962,11 @@ def execute_task_run(run_id: int) -> None:
                 log_app_event(
                     'error',
                     run.task_type,
-                    f'{run.task_type.title()} job failed.',
+                    (
+                        'Plex cache job failed.'
+                        if run.task_type == 'plex_cache'
+                        else f'{run.task_type.title()} job failed.'
+                    ),
                     details=str(exc),
                     related_type='task_run',
                     related_id=run.id,
@@ -816,7 +1090,7 @@ def execute_detection_run(run_id: int) -> None:
         )
 
         try:
-            result = auto_detect_and_sync(force=True, sync_new_events=True)
+            result = auto_detect_and_sync(force=True, sync_new_events=False)
 
             run.status = 'success'
             run.candidates_cached = int(result.get('cached') or 0)
@@ -837,6 +1111,9 @@ def execute_detection_run(run_id: int) -> None:
                 related_type='detection_run',
                 related_id=run.id,
             )
+
+            if result.get('sync_needed'):
+                enqueue_task_run(current_app._get_current_object(), 'sync', 'auto')
 
         except Exception as exc:
             db.session.rollback()
@@ -1052,13 +1329,14 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
     settings = AppSettings.get_or_create()
 
     if not force and not settings.auto_detection_enabled:
-        return {'cached': 0, 'created_events': 0, 'updated_people': 0}
+        return {'cached': 0, 'created_events': 0, 'updated_people': 0, 'sync_needed': False}
 
     detector = DetectionService(settings)
     rows = detector.refresh_candidate_cache(limit=None)
 
     updated_people = 0
     created_events = 0
+    sync_needed = False
     people_by_slug: dict[str, Person] = {}
 
     for row in rows:
@@ -1103,14 +1381,16 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
         if active_event:
             active_event.priority = selection_priority
 
-            if sync_new_events:
-                should_sync_existing_event = (
-                    active_event.last_synced_at is None
-                    or not active_event.publications
-                    or not any(pub.status == 'synced' for pub in active_event.publications)
-                )
+            should_sync_existing_event = (
+                active_event.last_synced_at is None
+                or not active_event.publications
+                or not any(pub.status == 'synced' for pub in active_event.publications)
+            )
 
-                if should_sync_existing_event:
+            if should_sync_existing_event:
+                sync_needed = True
+
+                if sync_new_events:
                     sync_event(active_event)
 
             continue
@@ -1160,6 +1440,8 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
         )
         db.session.flush()
 
+        sync_needed = True
+
         if sync_new_events:
             sync_event(event)
 
@@ -1174,6 +1456,7 @@ def auto_detect_and_sync(force: bool = False, sync_new_events: bool = True):
         'cached': len(rows),
         'created_events': created_events,
         'updated_people': updated_people,
+        'sync_needed': sync_needed,
     }
 
 

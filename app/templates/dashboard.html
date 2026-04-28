@@ -1,72 +1,72 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-4 mb-6">
-  <div class="panel">
-    <div class="label">Active events</div>
-    <div class="value">{{ dashboard_overview.active_events_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Currently visible tribute events</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.active_events', default='Active events') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.active_events_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.active_events_desc', default='Currently visible tribute events') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Ending in 7 days</div>
-    <div class="value">{{ dashboard_overview.expiring_soon_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Events to watch soon</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.ending_soon', default='Ending in 7 days') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.expiring_soon_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.ending_soon_desc', default='Events to watch soon') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Published targets</div>
-    <div class="value">{{ dashboard_overview.published_targets_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Active event publications</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.published_targets', default='Published targets') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.published_targets_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.published_targets_desc', default='Active event publications') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Running jobs</div>
-    <div class="value">{{ dashboard_overview.running_jobs_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Detection / sync / expire</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.running_jobs', default='Running jobs') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.running_jobs_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.running_jobs_desc', default='Detection / sync / expire') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Missing movies</div>
-    <div class="value">{{ dashboard_overview.missing_movies_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Total missing movie titles</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.missing_movies', default='Missing movies') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.missing_movies_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.missing_movies_desc', default='Total missing movie titles') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Missing shows</div>
-    <div class="value">{{ dashboard_overview.missing_shows_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Total missing show titles</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.missing_shows', default='Missing shows') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.missing_shows_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.missing_shows_desc', default='Total missing show titles') }}</div>
   </div>
 
-  <div class="panel">
-    <div class="label">Arr-ready missing</div>
-    <div class="value">{{ dashboard_overview.arr_ready_missing_titles_count }}</div>
-    <div class="mt-2 text-sm text-emerald-200/70">Missing titles that can be sent now</div>
+  <div class="panel dashboard-stat-card">
+    <div class="label dashboard-stat-label">{{ t('dashboard.stats.arr_ready_missing', default='Arr-ready missing') }}</div>
+    <div class="value dashboard-stat-value">{{ dashboard_overview.arr_ready_missing_titles_count }}</div>
+    <div class="dashboard-stat-desc">{{ t('dashboard.stats.arr_ready_missing_desc', default='Missing titles that can be sent now') }}</div>
   </div>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
   <a href="{{ url_for('people.index', status='excluded', source='all', missing='all', sort='priority_desc') }}" class="panel hover:bg-white/5 transition">
-    <div class="label">Excluded from auto</div>
+    <div class="label">{{ t('dashboard.shortcuts.excluded', default='Excluded from auto') }}</div>
     <div class="value">{{ dashboard_overview.excluded_people_count }}</div>
     <div class="mt-2 text-sm text-emerald-200/70">
-      People manually excluded from automatic selection
+      {{ t('dashboard.shortcuts.excluded_desc', default='People manually excluded from automatic selection') }}
     </div>
   </a>
 
   <a href="{{ url_for('people.index', status='ignored', source='all', missing='all', sort='priority_desc') }}" class="panel hover:bg-white/5 transition">
-    <div class="label">Ignored for now</div>
+    <div class="label">{{ t('dashboard.shortcuts.ignored', default='Ignored for now') }}</div>
     <div class="value">{{ dashboard_overview.ignored_people_count }}</div>
     <div class="mt-2 text-sm text-emerald-200/70">
-      People currently ignored until a future date
+      {{ t('dashboard.shortcuts.ignored_desc', default='People currently ignored until a future date') }}
     </div>
   </a>
 </div>
 
 <div class="dashboard-advanced-toolbar mb-6">
   <div>
-    <h2 class="text-lg font-semibold text-white">Dashboard details</h2>
+    <h2 class="text-lg font-semibold text-white">{{ t('dashboard.advanced.title', default='Dashboard details') }}</h2>
     <p class="text-sm text-emerald-200/70">
-      Secondary widgets can be hidden to keep the dashboard focused on daily actions.
+      {{ t('dashboard.advanced.subtitle', default='Secondary widgets can be hidden to keep the dashboard focused on daily actions.') }}
     </p>
   </div>
 
@@ -77,7 +77,7 @@
     aria-expanded="true"
     aria-controls="dashboard-advanced-sections"
   >
-    Hide advanced
+    {{ t('dashboard.advanced.hide', default='Hide advanced') }}
   </button>
 </div>
 
@@ -87,48 +87,50 @@
   <div class="panel xl:col-span-2">
     <div class="flex items-center justify-between gap-4 mb-4">
       <div>
-        <h2 class="text-xl font-semibold text-white">Current settings snapshot</h2>
+        <h2 class="text-xl font-semibold text-white">{{ t('dashboard.settings_snapshot.title', default='Current settings snapshot') }}</h2>
         <p class="text-sm text-emerald-200/70">
-          Quick view of the rules currently driving automatic selection.
+          {{ t('dashboard.settings_snapshot.subtitle', default='Quick view of the rules currently driving automatic selection.') }}
         </p>
       </div>
-      <a class="btn-secondary" href="{{ url_for('settings.index') }}">Open settings</a>
+      <a class="btn-secondary" href="{{ url_for('settings.index') }}">{{ t('dashboard.settings_snapshot.open_settings', default='Open settings') }}</a>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
-        <div class="label">Auto detection</div>
-        <div class="value text-2xl">{{ 'Enabled' if settings.auto_detection_enabled else 'Disabled' }}</div>
+        <div class="label">{{ t('dashboard.settings_snapshot.auto_detection', default='Auto detection') }}</div>
+        <div class="value text-2xl">
+          {{ t('dashboard.settings_snapshot.enabled', default='Enabled') if settings.auto_detection_enabled else t('dashboard.settings_snapshot.disabled', default='Disabled') }}
+        </div>
       </div>
 
       <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
-        <div class="label">Display days</div>
+        <div class="label">{{ t('dashboard.settings_snapshot.display_days', default='Display days') }}</div>
         <div class="value text-2xl">{{ settings.display_days }}</div>
       </div>
 
       <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
-        <div class="label">Max people</div>
+        <div class="label">{{ t('dashboard.settings_snapshot.max_people', default='Max people') }}</div>
         <div class="value text-2xl">{{ settings.max_people }}</div>
       </div>
 
       <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-4">
-        <div class="label">Cached candidates</div>
+        <div class="label">{{ t('dashboard.settings_snapshot.cached_candidates', default='Cached candidates') }}</div>
         <div class="value text-2xl">{{ dashboard_overview.cached_candidates_count }}</div>
       </div>
     </div>
 
     <div class="mt-4 text-sm text-emerald-100/80">
-      <span class="text-emerald-300">Countries:</span>
-      {{ settings.countries() | join(', ') if settings.countries() else 'All countries' }}
+      <span class="text-emerald-300">{{ t('dashboard.settings_snapshot.countries', default='Countries:') }}</span>
+      {{ settings.countries() | join(', ') if settings.countries() else t('dashboard.settings_snapshot.all_countries', default='All countries') }}
     </div>
   </div>
 
   <div class="panel">
     <div class="flex items-center justify-between gap-4 mb-4">
       <div>
-        <h2 class="text-xl font-semibold text-white">Top countries</h2>
+        <h2 class="text-xl font-semibold text-white">{{ t('dashboard.top_countries.title', default='Top countries') }}</h2>
         <p class="text-sm text-emerald-200/70">
-          Based on currently active events.
+          {{ t('dashboard.top_countries.subtitle', default='Based on currently active events.') }}
         </p>
       </div>
     </div>
@@ -138,13 +140,19 @@
         {% for item in dashboard_overview.top_countries %}
           <div class="flex items-center justify-between gap-4 rounded-2xl border border-emerald-400/10 bg-black/10 px-4 py-3">
             <div class="text-white font-medium">{{ item.name }}</div>
-            <div class="text-emerald-200/80 text-sm">{{ item.count }} event{{ 's' if item.count != 1 else '' }}</div>
+            <div class="text-emerald-200/80 text-sm">
+              {{
+                t('dashboard.top_countries.events_one', default='{count} event', count=item.count)
+                if item.count == 1
+                else t('dashboard.top_countries.events_many', default='{count} events', count=item.count)
+              }}
+            </div>
           </div>
         {% endfor %}
       </div>
     {% else %}
       <div class="text-sm text-emerald-200/60">
-        No country data available on active events yet.
+        {{ t('dashboard.top_countries.empty', default='No country data available on active events yet.') }}
       </div>
     {% endif %}
   </div>
@@ -187,57 +195,122 @@
   <div class="panel">
     <div class="flex items-center justify-between gap-4 mb-4">
       <div>
-        <h2 class="text-xl font-semibold text-white">Problematic events</h2>
+        <h2 class="text-xl font-semibold text-white">Collection publishing overview</h2>
         <p class="text-sm text-emerald-200/70">
-          Active events needing attention.
+          Current publication health for live active events.
         </p>
       </div>
       <div class="text-xs text-emerald-200/60">
-        {{ dashboard_overview.problematic_events_count }} total
+        {{ dashboard_overview.publication_overview.total }} total
       </div>
     </div>
 
-    {% if dashboard_overview.problematic_events %}
-      <div class="space-y-3">
-        {% for item in dashboard_overview.problematic_events %}
-          {% set event = item.event %}
-          <div class="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-3">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <a class="text-white font-medium hover:text-amber-100" href="{{ url_for('people.detail', person_id=event.person_id) }}">
-                  {{ event.person.name }}
-                </a>
-                <div class="mt-1 text-xs text-amber-100/80">
-                  {{ event.start_date }} → {{ event.end_date }}
-                </div>
-              </div>
-              <div class="text-xs text-amber-100/80">
-                {{ event.days_remaining }} day{{ 's' if event.days_remaining != 1 else '' }}
-              </div>
-            </div>
-
-            <div class="mt-2 flex flex-wrap gap-2">
-              {% for reason in item.reasons %}
-                <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-100 border border-amber-300/20">
-                  {{ reason }}
-                </span>
-              {% endfor %}
-            </div>
-          </div>
-        {% endfor %}
+    <div class="grid grid-cols-2 gap-3">
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-3">
+        <div class="label">Synced</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.synced }}</div>
       </div>
 
+      <div class="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-3">
+        <div class="label">Missing</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.missing }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-rose-400/15 bg-rose-500/10 p-3">
+        <div class="label">Errors</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.error }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-sky-400/15 bg-sky-500/10 p-3">
+        <div class="label">Pending</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.pending }}</div>
+      </div>
+    </div>
+
+    <div class="mt-3 grid grid-cols-2 gap-3">
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-3">
+        <div class="label">Stale syncs</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.stale }}</div>
+      </div>
+
+      <div class="rounded-2xl border border-emerald-400/10 bg-black/10 p-3">
+        <div class="label">Zero media</div>
+        <div class="value text-2xl">{{ dashboard_overview.publication_overview.zero_media }}</div>
+      </div>
+    </div>
+
+    {% if dashboard_overview.publication_overview.top_targets %}
       <div class="mt-4">
-        <a class="btn-secondary w-full justify-center" href="{{ url_for('main.dashboard', status='active', view='problematic', sort=sort_by) }}">
-          Show problematic events
-        </a>
-      </div>
-    {% else %}
-      <div class="text-sm text-emerald-200/60">
-        No obvious anomaly on active events.
+        <div class="text-xs uppercase tracking-wide text-emerald-200/60 mb-2">
+          Top published libraries
+        </div>
+
+        <div class="space-y-2">
+          {% for item in dashboard_overview.publication_overview.top_targets %}
+            <div class="flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/10 bg-black/10 px-3 py-2">
+              <div class="text-sm text-white truncate">{{ item.name }}</div>
+              <div class="text-xs text-emerald-200/70">{{ item.count }}</div>
+            </div>
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
   </div>
+</div>
+
+<div class="panel mb-6">
+  <div class="flex items-center justify-between gap-4 mb-4">
+    <div>
+      <h2 class="text-xl font-semibold text-white">Problematic events</h2>
+      <p class="text-sm text-emerald-200/70">
+        Active events needing attention.
+      </p>
+    </div>
+    <div class="text-xs text-emerald-200/60">
+      {{ dashboard_overview.problematic_events_count }} total
+    </div>
+  </div>
+
+  {% if dashboard_overview.problematic_events %}
+    <div class="space-y-3">
+      {% for item in dashboard_overview.problematic_events %}
+        {% set event = item.event %}
+        <div class="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <a class="text-white font-medium hover:text-amber-100" href="{{ url_for('people.detail', person_id=event.person_id) }}">
+                {{ event.person.name }}
+              </a>
+              <div class="mt-1 text-xs text-amber-100/80">
+                {{ event.start_date }} → {{ event.end_date }}
+              </div>
+            </div>
+            <div class="text-xs text-amber-100/80">
+              {{ event.days_remaining }} day{{ 's' if event.days_remaining != 1 else '' }}
+            </div>
+          </div>
+
+          <div class="mt-2 flex flex-wrap gap-2">
+            {% for reason in item.reasons %}
+              <span class="px-2 py-1 rounded-full text-[11px] uppercase tracking-wide bg-amber-500/20 text-amber-100 border border-amber-300/20">
+                {{ reason }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4">
+      <a class="btn-secondary w-full justify-center" href="{{ url_for('main.dashboard', status='active', view='problematic', sort=sort_by) }}">
+        Show problematic events
+      </a>
+    </div>
+  {% else %}
+    <div class="text-sm text-emerald-200/60">
+      No obvious anomaly on active events.
+    </div>
+  {% endif %}
 </div>
 
 <div class="panel mb-6">
@@ -462,6 +535,21 @@
           Expire status: <span class="font-semibold">idle</span>
         {% endif %}
       </div>
+      <div id="plex-cache-job-state" class="mt-2 text-sm text-emerald-100/80">
+        {% if latest_plex_cache_run %}
+          Plex cache status:
+          <span class="font-semibold">{{ latest_plex_cache_run.status }}</span>
+          {% if latest_plex_cache_run.status == 'success' %}
+            — {{ latest_plex_cache_run.message or (latest_plex_cache_run.success_items ~ ' success, ' ~ latest_plex_cache_run.error_items ~ ' error(s).') }}
+          {% elif latest_plex_cache_run.status == 'error' %}
+            — {{ latest_plex_cache_run.message or 'Unknown error' }}
+          {% elif latest_plex_cache_run.status in ['pending', 'running'] %}
+            — {{ latest_plex_cache_run.message or 'Plex cache refresh is running in background...' }}
+          {% endif %}
+        {% else %}
+          Plex cache status: <span class="font-semibold">idle</span>
+        {% endif %}
+      </div>
     </div>
 
     <div class="flex flex-wrap gap-2">
@@ -475,6 +563,12 @@
         <button class="btn-secondary">
           <span class="btn-icon">⇄</span>
           <span>Run sync</span>
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('main.run_plex_cache_refresh') }}">
+        <button class="btn-secondary">
+          <span class="btn-icon">⟳</span>
+          <span>Sync with Plex</span>
         </button>
       </form>
       <form method="post" action="{{ url_for('main.run_expire') }}">
@@ -767,6 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const detectionEl = document.getElementById('detection-job-state');
   const syncEl = document.getElementById('sync-job-state');
   const expireEl = document.getElementById('expire-job-state');
+  const plexCacheEl = document.getElementById('plex-cache-job-state');
   const advancedToggleEl = document.getElementById('dashboard-advanced-toggle');
   const advancedSectionsEl = document.getElementById('dashboard-advanced-sections');
 
@@ -778,7 +873,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     advancedSectionsEl.classList.toggle('dashboard-advanced-hidden', hidden);
     advancedToggleEl.setAttribute('aria-expanded', hidden ? 'false' : 'true');
-    advancedToggleEl.textContent = hidden ? 'Show advanced' : 'Hide advanced';
+    advancedToggleEl.textContent = hidden
+      ? {{ t('dashboard.advanced.show', default='Show advanced')|tojson }}
+      : {{ t('dashboard.advanced.hide', default='Hide advanced')|tojson }};
   };
 
   if (advancedSectionsEl && advancedToggleEl) {
@@ -792,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (!detectionEl && !syncEl && !expireEl) return;
+  if (!detectionEl && !syncEl && !expireEl && !plexCacheEl) return;
 
   let previousSnapshot = null;
   let reloadScheduled = false;
@@ -817,7 +914,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const shouldReloadFromTransition = (previousData, currentData) => {
     if (!previousData) return false;
 
-    for (const key of ['detection', 'sync', 'expire']) {
+    for (const key of ['detection', 'sync', 'expire', 'plex_cache']) {
       const prev = previousData[key];
       const curr = currentData[key];
 
@@ -848,6 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderLine(detectionEl, 'Detection', data.detection, 'No detection job yet.');
       renderLine(syncEl, 'Sync', data.sync, 'No sync job yet.');
       renderLine(expireEl, 'Expire', data.expire, 'No expire job yet.');
+      renderLine(plexCacheEl, 'Plex cache', data.plex_cache, 'No Plex cache refresh yet.');
 
       if (shouldReloadFromTransition(previousSnapshot, data)) {
         reloadScheduled = true;
