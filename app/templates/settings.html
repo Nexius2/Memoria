@@ -23,6 +23,7 @@
     data-form-type="other"
   >
     <input type="hidden" name="_autosave" value="1">
+
     <div>
       <label class="field-label">{{ t('settings.language.label', default='Interface language *') }}</label>
       <select class="field" name="ui_language">
@@ -33,9 +34,8 @@
       <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.language.help', default='Choose a fixed language, or use the browser language automatically.') }}</div>
     </div>
 
-
     <div>
-      <label class="field-label">TMDb API key</label>
+      <label class="field-label">{{ t('settings.form.tmdb_api_key.label', default='TMDb API key') }}</label>
       <div class="relative">
         <input
           id="tmdb-api-key-input"
@@ -49,177 +49,177 @@
             type="button"
             class="text-xs text-emerald-200/70 hover:text-white"
             data-secret-copy="tmdb-api-key-input"
-            title="Copier"
-            aria-label="Copier"
+            title="{{ t('base.secret.copy', default='Copy') }}"
+            aria-label="{{ t('base.secret.copy', default='Copy') }}"
           >
-            Copy
+            {{ t('base.secret.copy', default='Copy') }}
           </button>
           <button
             type="button"
             class="text-emerald-200/70 hover:text-white"
             data-secret-toggle="tmdb-api-key-input"
-            title="Afficher"
-            aria-label="Afficher"
+            title="{{ t('base.secret.show', default='Show') }}"
+            aria-label="{{ t('base.secret.show', default='Show') }}"
           >
             👁
           </button>
         </div>
       </div>
-      <div class="text-xs text-emerald-200/60 mt-1">Used to improve filmography matching and missing titles detection.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.tmdb_api_key.help', default='Used to improve filmography matching and missing titles detection.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Detection window days *</label>
+      <label class="field-label">{{ t('settings.form.detection_window_days.label', default='Detection window days *') }}</label>
       <input class="field" type="number" min="1" name="detection_window_days" value="{{ settings.detection_window_days }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">How many recent days are scanned when looking for newly deceased people.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.detection_window_days.help', default='How many recent days are scanned when looking for newly deceased people.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Display days *</label>
+      <label class="field-label">{{ t('settings.form.display_days.label', default='Display days *') }}</label>
       <input class="field" type="number" min="1" name="display_days" value="{{ settings.display_days }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">How long a tribute event and its Plex collections stay active.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.display_days.help', default='How long a tribute event and its Plex collections stay active.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Max simultaneous people *</label>
+      <label class="field-label">{{ t('settings.form.max_people.label', default='Max simultaneous people *') }}</label>
       <input class="field" type="number" min="1" name="max_people" value="{{ settings.max_people }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Maximum number of tribute events created from recent candidates. Most popular candidates are selected first.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.max_people.help', default='Maximum number of tribute events created from recent candidates. Most popular candidates are selected first.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Minimum people priority level *</label>
+      <label class="field-label">{{ t('settings.form.min_people_priority_display.label', default='Minimum people priority level *') }}</label>
       <input class="field" type="number" min="0" name="min_people_priority_display" value="{{ settings.min_people_priority_display }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Hide low-priority web candidates from the dashboard and People page unless they are pinned, manually prioritized, or already active.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.min_people_priority_display.help', default='Hide low-priority web candidates from the dashboard and People page unless they are pinned, manually prioritized, or already active.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Log retention days *</label>
+      <label class="field-label">{{ t('settings.form.log_retention_days.label', default='Log retention days *') }}</label>
       <input class="field" type="number" min="1" name="log_retention_days" value="{{ settings.log_retention_days }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Application logs older than this are deleted automatically.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.log_retention_days.help', default='Application logs older than this are deleted automatically.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Job retention days *</label>
+      <label class="field-label">{{ t('settings.form.job_retention_days.label', default='Job retention days *') }}</label>
       <input class="field" type="number" min="1" name="job_retention_days" value="{{ settings.job_retention_days }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Detection and task history older than this are deleted automatically.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.job_retention_days.help', default='Detection and task history older than this are deleted automatically.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Arr activity retention days *</label>
+      <label class="field-label">{{ t('settings.form.arr_activity_retention_days.label', default='Arr activity retention days *') }}</label>
       <input class="field" type="number" min="1" name="arr_activity_retention_days" value="{{ settings.arr_activity_retention_days }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Arr push history older than this is deleted automatically.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.arr_activity_retention_days.help', default='Arr push history older than this is deleted automatically.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Missing titles refresh hours *</label>
+      <label class="field-label">{{ t('settings.form.missing_titles_refresh_hours.label', default='Missing titles refresh hours *') }}</label>
       <input class="field" type="number" min="1" name="missing_titles_refresh_hours" value="{{ settings.missing_titles_refresh_hours }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">How often the background scheduler refreshes each person's missing movies and shows cache.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.missing_titles_refresh_hours.help', default='How often the background scheduler refreshes each person missing movies and shows cache.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Backup interval hours *</label>
+      <label class="field-label">{{ t('settings.form.backup_interval_hours.label', default='Backup interval hours *') }}</label>
       <input class="field" type="number" min="1" name="backup_interval_hours" value="{{ settings.backup_interval_hours }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">How often automatic database backups may be created.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.backup_interval_hours.help', default='How often automatic database backups may be created.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Backup retention count *</label>
+      <label class="field-label">{{ t('settings.form.backup_retention_count.label', default='Backup retention count *') }}</label>
       <input class="field" type="number" min="1" name="backup_retention_count" value="{{ settings.backup_retention_count }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">How many backup files are kept before older ones are pruned automatically.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.backup_retention_count.help', default='How many backup files are kept before older ones are pruned automatically.') }}</div>
     </div>
 
     <div>
-      <label class="field-label">Default media mode *</label>
+      <label class="field-label">{{ t('settings.form.default_media_mode.label', default='Default media mode *') }}</label>
       <select class="field" name="default_media_mode">
-        <option value="both" {% if settings.default_media_mode=='both' %}selected{% endif %}>Both</option>
-        <option value="movie" {% if settings.default_media_mode=='movie' %}selected{% endif %}>Movies only</option>
-        <option value="show" {% if settings.default_media_mode=='show' %}selected{% endif %}>Shows only</option>
+        <option value="both" {% if settings.default_media_mode=='both' %}selected{% endif %}>{{ t('settings.form.default_media_mode.both', default='Both') }}</option>
+        <option value="movie" {% if settings.default_media_mode=='movie' %}selected{% endif %}>{{ t('settings.form.default_media_mode.movie', default='Movies only') }}</option>
+        <option value="show" {% if settings.default_media_mode=='show' %}selected{% endif %}>{{ t('settings.form.default_media_mode.show', default='Shows only') }}</option>
       </select>
-      <div class="text-xs text-emerald-200/60 mt-1">Default target content when an event is created automatically.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.default_media_mode.help', default='Default target content when an event is created automatically.') }}</div>
     </div>
 
     <div class="md:col-span-2">
-      <label class="field-label">Countries</label>
+      <label class="field-label">{{ t('settings.form.countries.label', default='Countries') }}</label>
       <input class="field" type="text" name="countries_csv" value="{{ settings.countries_csv }}">
-      <div class="text-xs text-emerald-200/60 mt-1">Comma-separated nationality filter. Leave empty to search all countries.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.countries.help', default='Comma-separated nationality filter. Leave empty to search all countries.') }}</div>
     </div>
 
     <div class="md:col-span-2">
-      <label class="field-label">Professions</label>
+      <label class="field-label">{{ t('settings.form.professions.label', default='Professions') }}</label>
       <input class="field" type="text" name="professions_csv" value="{{ settings.professions_csv }}">
-      <div class="text-xs text-emerald-200/60 mt-1">Comma-separated occupations filter, for example: actor,actress,director.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.professions.help', default='Comma-separated occupations filter, for example: actor,actress,director.') }}</div>
     </div>
 
     <div class="md:col-span-2">
-      <label class="field-label">Collection name template *</label>
+      <label class="field-label">{{ t('settings.form.collection_name_template.label', default='Collection name template *') }}</label>
       <input class="field" type="text" name="collection_name_template" value="{{ settings.collection_name_template }}" required>
-      <div class="text-xs text-emerald-200/60 mt-1">Used when creating Plex collections.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.collection_name_template.help', default='Used when creating Plex collections.') }}</div>
     </div>
 
     <div class="md:col-span-2">
-      <label class="field-label">Collection summary template *</label>
+      <label class="field-label">{{ t('settings.form.collection_summary_template.label', default='Collection summary template *') }}</label>
       <textarea class="field min-h-32" name="collection_summary_template" required>{{ settings.collection_summary_template }}</textarea>
-      <div class="text-xs text-emerald-200/60 mt-1">Used as the Plex collection description.</div>
+      <div class="text-xs text-emerald-200/60 mt-1">{{ t('settings.form.collection_summary_template.help', default='Used as the Plex collection description.') }}</div>
     </div>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="auto_detection_enabled" {% if settings.auto_detection_enabled %}checked{% endif %}>
       <span>
-        <span class="block">Enable web auto-detection</span>
-        <span class="block text-xs text-emerald-200/60">Allows the background scheduler to refresh candidates and create tribute events automatically. Manual dashboard actions still work even if this is disabled.</span>
+        <span class="block">{{ t('settings.form.auto_detection_enabled.label', default='Enable web auto-detection') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.auto_detection_enabled.help', default='Allows the background scheduler to refresh candidates and create tribute events automatically. Manual dashboard actions still work even if this is disabled.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="deduplicate_people" {% if settings.deduplicate_people %}checked{% endif %}>
       <span>
-        <span class="block">Deduplicate people</span>
-        <span class="block text-xs text-emerald-200/60">Avoids duplicate entries when the same person appears multiple times in source results.</span>
+        <span class="block">{{ t('settings.form.deduplicate_people.label', default='Deduplicate people') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.deduplicate_people.help', default='Avoids duplicate entries when the same person appears multiple times in source results.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="auto_missing_titles_enabled" {% if settings.auto_missing_titles_enabled %}checked{% endif %}>
       <span>
-        <span class="block">Enable automatic missing titles scan</span>
-        <span class="block text-xs text-emerald-200/60">Refreshes each person's missing movies and shows in background automatically, without opening the person page.</span>
+        <span class="block">{{ t('settings.form.auto_missing_titles_enabled.label', default='Enable automatic missing titles scan') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.auto_missing_titles_enabled.help', default='Refreshes each person missing movies and shows in background automatically, without opening the person page.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="auto_arr_enabled" {% if settings.auto_arr_enabled %}checked{% endif %}>
       <span>
-        <span class="block">Enable automatic Arr push</span>
-        <span class="block text-xs text-emerald-200/60">Automatically sends missing movies and shows for active tribute events to linked Radarr / Sonarr targets.</span>
+        <span class="block">{{ t('settings.form.auto_arr_enabled.label', default='Enable automatic Arr push') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.auto_arr_enabled.help', default='Automatically sends missing movies and shows for active tribute events to linked Radarr / Sonarr targets.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="auto_backup_enabled" {% if settings.auto_backup_enabled %}checked{% endif %}>
       <span>
-        <span class="block">Enable automatic database backup</span>
-        <span class="block text-xs text-emerald-200/60">Creates SQLite backups in the instance/backups folder and keeps only the newest files according to the configured retention count.</span>
+        <span class="block">{{ t('settings.form.auto_backup_enabled.label', default='Enable automatic database backup') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.auto_backup_enabled.help', default='Creates SQLite backups in the configured backup folder and keeps only the newest files according to the configured retention count.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="publish_on_home" {% if settings.publish_on_home %}checked{% endif %}>
       <span>
-        <span class="block">Publish on home (stored)</span>
-        <span class="block text-xs text-emerald-200/60">Global preference stored by the app and combined with each library setting.</span>
+        <span class="block">{{ t('settings.form.publish_on_home.label', default='Publish on home (stored)') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.publish_on_home.help', default='Global preference stored by the app and combined with each library setting.') }}</span>
       </span>
     </label>
 
     <label class="inline-flex items-start gap-2 text-sm">
       <input type="checkbox" name="publish_on_friends_home" {% if settings.publish_on_friends_home %}checked{% endif %}>
       <span>
-        <span class="block">Publish on friends home (stored)</span>
-        <span class="block text-xs text-emerald-200/60">Global preference stored by the app and combined with each library setting.</span>
+        <span class="block">{{ t('settings.form.publish_on_friends_home.label', default='Publish on friends home (stored)') }}</span>
+        <span class="block text-xs text-emerald-200/60">{{ t('settings.form.publish_on_friends_home.help', default='Global preference stored by the app and combined with each library setting.') }}</span>
       </span>
     </label>
 
     <div class="md:col-span-2 text-xs text-emerald-200/60">
-      Available variables: {person_name}, {death_date}, {country}, {days_remaining}, {library_name}, {server_name}, {profession}
+      {{ t('settings.form.available_variables', default='Available variables:') }} {person_name}, {death_date}, {country}, {days_remaining}, {library_name}, {server_name}, {profession}
     </div>
   </form>
 </div>

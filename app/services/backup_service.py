@@ -39,7 +39,15 @@ def get_database_path() -> Path:
 
 
 def get_backup_directory() -> Path:
-    backup_dir = Path(current_app.instance_path) / 'backups'
+    configured_backup_path = (os.getenv('BACKUP_PATH') or '').strip()
+
+    if configured_backup_path:
+        backup_dir = Path(configured_backup_path)
+    else:
+        database_path = get_database_path()
+        backup_dir = database_path.parent / 'backups'
+
+    backup_dir = backup_dir.resolve()
     backup_dir.mkdir(parents=True, exist_ok=True)
     return backup_dir
 

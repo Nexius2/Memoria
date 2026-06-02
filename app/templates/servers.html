@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 {% from '_secret_fields.html' import secret_input_attrs %}
 {% block content %}
+
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
   <div class="panel">
-    <h2 class="text-xl font-semibold text-white mb-4">Add Plex server</h2>
+    <h2 class="text-xl font-semibold text-white mb-4">{{ t('servers.add.title', default='Add Plex server') }}</h2>
+
     <form
       method="post"
       action="{{ url_for('servers.create_server') }}"
@@ -11,67 +13,68 @@
       autocomplete="off"
       data-form-type="other"
     >
-
       <div>
-        <label class="field-label">Name *</label>
+        <label class="field-label">{{ t('servers.fields.name', default='Name *') }}</label>
         <input class="field" type="text" name="name" required>
       </div>
 
       <div>
-        <label class="field-label">Base URL *</label>
+        <label class="field-label">{{ t('servers.fields.base_url', default='Base URL *') }}</label>
         <input class="field" type="text" name="base_url" placeholder="http://plex:32400" required>
       </div>
 
-        <div>
-          <label class="field-label">Token *</label>
-          <div class="relative">
-            <input
-              id="plex-add-token-input"
-              class="field pr-28"
-              name="token"
-              {{ secret_input_attrs() }}
-              required
+      <div>
+        <label class="field-label">{{ t('servers.fields.token_required', default='Token *') }}</label>
+        <div class="relative">
+          <input
+            id="plex-add-token-input"
+            class="field pr-28"
+            name="token"
+            {{ secret_input_attrs() }}
+            required
+          >
+          <div class="absolute inset-y-0 right-3 flex items-center gap-2">
+            <button
+              type="button"
+              class="text-xs text-emerald-200/70 hover:text-white"
+              data-secret-copy="plex-add-token-input"
+              title="{{ t('base.secret.copy', default='Copy') }}"
+              aria-label="{{ t('base.secret.copy', default='Copy') }}"
             >
-            <div class="absolute inset-y-0 right-3 flex items-center gap-2">
-              <button
-                type="button"
-                class="text-xs text-emerald-200/70 hover:text-white"
-                data-secret-copy="plex-add-token-input"
-                title="Copier"
-                aria-label="Copier"
-              >
-                Copy
-              </button>
-              <button
-                type="button"
-                class="text-emerald-200/70 hover:text-white"
-                data-secret-toggle="plex-add-token-input"
-                title="Afficher"
-                aria-label="Afficher"
-              >
-                👁
-              </button>
-            </div>
+              {{ t('base.secret.copy', default='Copy') }}
+            </button>
+            <button
+              type="button"
+              class="text-emerald-200/70 hover:text-white"
+              data-secret-toggle="plex-add-token-input"
+              title="{{ t('base.secret.show', default='Show') }}"
+              aria-label="{{ t('base.secret.show', default='Show') }}"
+            >
+              👁
+            </button>
           </div>
         </div>
+      </div>
 
       <label class="inline-flex items-center gap-2 text-sm">
-        <input type="checkbox" name="verify_ssl"> Verify SSL
+        <input type="checkbox" name="verify_ssl">
+        {{ t('servers.fields.verify_ssl', default='Verify SSL') }}
       </label>
 
       <label class="inline-flex items-center gap-2 text-sm">
-        <input type="checkbox" name="enabled" checked> Enabled
+        <input type="checkbox" name="enabled" checked>
+        {{ t('servers.fields.enabled', default='Enabled') }}
       </label>
 
-      <button class="btn-primary w-full">Add server</button>
+      <button class="btn-primary w-full" type="submit">{{ t('servers.actions.add_server', default='Add server') }}</button>
     </form>
   </div>
 
   <div class="xl:col-span-2 space-y-6">
     <div class="panel text-sm text-emerald-200/70">
-      Enabled libraries keep a cached Plex title index used by the automatic missing titles scan.
-      The cache is refreshed by the scheduler, so people scans do not need to re-read the whole Plex library every time.
+      {{ t('servers.info.cache_help', default='Enabled libraries keep a cached Plex title index used by the automatic missing titles scan. The cache is refreshed by the scheduler, so people scans do not need to re-read the whole Plex library every time.') }}
     </div>
+
     {% for server in servers %}
       <div class="panel">
         <div class="flex flex-wrap gap-3 justify-between items-start">
@@ -82,15 +85,12 @@
 
           <div class="flex flex-wrap gap-2 items-center">
             <form method="post" action="{{ url_for('servers.discover_libraries', server_id=server.id) }}">
-              <button class="btn-secondary" type="submit">Discover libraries</button>
+              <button class="btn-secondary" type="submit">{{ t('servers.actions.discover_libraries', default='Discover libraries') }}</button>
             </form>
 
-			<form
-			  method="post"
-			  action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}"
-			>
-			  <button class="btn-secondary" type="submit">Refresh Plex cache</button>
-			</form>
+            <form method="post" action="{{ url_for('servers.refresh_server_cache', server_id=server.id) }}">
+              <button class="btn-secondary" type="submit">{{ t('servers.actions.refresh_cache', default='Refresh Plex cache') }}</button>
+            </form>
 
             <button
               type="button"
@@ -100,32 +100,32 @@
               aria-expanded="false"
               aria-controls="server-edit-{{ server.id }}"
             >
-              Edit <span id="server-edit-arrow-{{ server.id }}">▼</span>
+              {{ t('servers.actions.edit', default='Edit') }} <span id="server-edit-arrow-{{ server.id }}">▼</span>
             </button>
 
-			<form
-			  method="post"
-			  action="{{ url_for('servers.delete_server', server_id=server.id) }}"
-			  class="js-confirm-delete-form"
-			  data-confirm-title="Delete Plex server"
-			  data-confirm-message="Are you sure you want to delete the Plex server '{{ server.name }}' ? Its discovered library mappings will also be removed."
-			  data-confirm-button="Delete Plex server"
-			>
-			  <button class="btn-danger" type="submit">Delete</button>
-			</form>
+            <form
+              method="post"
+              action="{{ url_for('servers.delete_server', server_id=server.id) }}"
+              class="js-confirm-delete-form"
+              data-confirm-title="{{ t('servers.delete.title', default='Delete Plex server') }}"
+              data-confirm-message="{{ t('servers.delete.message', default='Are you sure you want to delete the Plex server ''{name}''? Its discovered library mappings will also be removed.', name=server.name) }}"
+              data-confirm-button="{{ t('servers.delete.button', default='Delete Plex server') }}"
+            >
+              <button class="btn-danger" type="submit">{{ t('servers.actions.delete', default='Delete') }}</button>
+            </form>
 
-			<button
-			  type="button"
-			  class="btn-secondary server-toggle"
-			  data-target="server-libraries-{{ server.id }}"
-			  data-arrow="server-arrow-{{ server.id }}"
-			  aria-expanded="{% if request.args.get('open_server') == (server.id|string) %}true{% else %}false{% endif %}"
-			  aria-controls="server-libraries-{{ server.id }}"
-			>
-			  <span id="server-arrow-{{ server.id }}">
-				{% if request.args.get('open_server') == (server.id|string) %}▲{% else %}▼{% endif %}
-			  </span>
-			</button>
+            <button
+              type="button"
+              class="btn-secondary server-toggle"
+              data-target="server-libraries-{{ server.id }}"
+              data-arrow="server-arrow-{{ server.id }}"
+              aria-expanded="{% if request.args.get('open_server') == (server.id|string) %}true{% else %}false{% endif %}"
+              aria-controls="server-libraries-{{ server.id }}"
+            >
+              <span id="server-arrow-{{ server.id }}">
+                {% if request.args.get('open_server') == (server.id|string) %}▲{% else %}▼{% endif %}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -133,7 +133,7 @@
           id="server-edit-{{ server.id }}"
           class="hidden mt-4 rounded-xl border border-emerald-400/10 bg-black/10 p-4"
         >
-          <h4 class="text-sm font-semibold text-white mb-4">Edit Plex server</h4>
+          <h4 class="text-sm font-semibold text-white mb-4">{{ t('servers.edit.title', default='Edit Plex server') }}</h4>
 
           <form
             method="post"
@@ -142,19 +142,18 @@
             autocomplete="off"
             data-form-type="other"
           >
-
             <div>
-              <label class="field-label">Name *</label>
+              <label class="field-label">{{ t('servers.fields.name', default='Name *') }}</label>
               <input class="field" type="text" name="name" value="{{ server.name }}" required>
             </div>
 
             <div>
-              <label class="field-label">Base URL *</label>
+              <label class="field-label">{{ t('servers.fields.base_url', default='Base URL *') }}</label>
               <input class="field" type="text" name="base_url" value="{{ server.base_url }}" required>
             </div>
 
             <div class="md:col-span-2">
-              <label class="field-label">Token</label>
+              <label class="field-label">{{ t('servers.fields.token', default='Token') }}</label>
               <div class="relative">
                 <input
                   id="plex-edit-token-input-{{ server.id }}"
@@ -168,17 +167,17 @@
                     type="button"
                     class="text-xs text-emerald-200/70 hover:text-white"
                     data-secret-copy="plex-edit-token-input-{{ server.id }}"
-                    title="Copier"
-                    aria-label="Copier"
+                    title="{{ t('base.secret.copy', default='Copy') }}"
+                    aria-label="{{ t('base.secret.copy', default='Copy') }}"
                   >
-                    Copy
+                    {{ t('base.secret.copy', default='Copy') }}
                   </button>
                   <button
                     type="button"
                     class="text-emerald-200/70 hover:text-white"
                     data-secret-toggle="plex-edit-token-input-{{ server.id }}"
-                    title="Afficher"
-                    aria-label="Afficher"
+                    title="{{ t('base.secret.show', default='Show') }}"
+                    aria-label="{{ t('base.secret.show', default='Show') }}"
                   >
                     👁
                   </button>
@@ -188,24 +187,24 @@
 
             <label class="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" name="verify_ssl" {% if server.verify_ssl %}checked{% endif %}>
-              Verify SSL
+              {{ t('servers.fields.verify_ssl', default='Verify SSL') }}
             </label>
 
             <label class="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" name="enabled" {% if server.enabled %}checked{% endif %}>
-              Enabled
+              {{ t('servers.fields.enabled', default='Enabled') }}
             </label>
 
             <div class="md:col-span-2 flex justify-end">
-              <button type="submit" class="btn-primary">Save Plex server</button>
+              <button type="submit" class="btn-primary">{{ t('servers.actions.save_server', default='Save Plex server') }}</button>
             </div>
           </form>
         </div>
 
-			<div
-			  id="server-libraries-{{ server.id }}"
-			  class="{% if request.args.get('open_server') == (server.id|string) %}mt-4 space-y-3{% else %}hidden mt-4 space-y-3{% endif %}"
-			>
+        <div
+          id="server-libraries-{{ server.id }}"
+          class="{% if request.args.get('open_server') == (server.id|string) %}mt-4 space-y-3{% else %}hidden mt-4 space-y-3{% endif %}"
+        >
           {% for library in server.libraries %}
             <form
               method="post"
@@ -221,28 +220,28 @@
                 <div class="mt-2 text-xs">
                   {% if library.plex_titles_cache_status == 'ready' %}
                     <div class="text-emerald-300">
-                      Plex cache ready
+                      {{ t('servers.cache.ready', default='Plex cache ready') }}
                       {% if library.plex_titles_cached_at %}
-						·
-						<span
-						  data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
-						  data-local-datetime-seconds="0"
-						>
-						  {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
-						</span>
+                        ·
+                        <span
+                          data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
+                          data-local-datetime-seconds="0"
+                        >
+                          {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+                        </span>
                       {% endif %}
                     </div>
                   {% elif library.plex_titles_cache_status == 'error' %}
                     <div class="text-red-300">
-                      Plex cache error
+                      {{ t('servers.cache.error', default='Plex cache error') }}
                       {% if library.plex_titles_cached_at %}
-						·
-						<span
-						  data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
-						  data-local-datetime-seconds="0"
-						>
-						  {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
-						</span>
+                        ·
+                        <span
+                          data-local-datetime="{{ library.plex_titles_cached_at|datetime_utc_iso if library.plex_titles_cached_at else '' }}"
+                          data-local-datetime-seconds="0"
+                        >
+                          {{ library.plex_titles_cached_at.strftime('%Y-%m-%d %H:%M') }}
+                        </span>
                       {% endif %}
                     </div>
                     {% if library.plex_titles_cache_error %}
@@ -252,7 +251,7 @@
                     {% endif %}
                   {% else %}
                     <div class="text-emerald-200/60">
-                      Plex cache pending
+                      {{ t('servers.cache.pending', default='Plex cache pending') }}
                     </div>
                   {% endif %}
                 </div>
@@ -260,23 +259,23 @@
 
               <label class="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" name="enabled" {% if library.enabled %}checked{% endif %}>
-                Enabled
+                {{ t('servers.library.enabled', default='Enabled') }}
               </label>
 
               <label class="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" name="publish_on_home" {% if library.publish_on_home %}checked{% endif %}>
-                Home
+                {{ t('servers.library.home', default='Home') }}
               </label>
 
               <label class="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" name="publish_on_friends_home" {% if library.publish_on_friends_home %}checked{% endif %}>
-                Friends home
+                {{ t('servers.library.friends_home', default='Friends home') }}
               </label>
 
               <div>
-                <label class="field-label">Arr mapping</label>
+                <label class="field-label">{{ t('servers.library.arr_mapping', default='Arr mapping') }}</label>
                 <select class="field" name="arr_server_id">
-                  <option value="">None</option>
+                  <option value="">{{ t('servers.library.none', default='None') }}</option>
                   {% for arr in arr_servers %}
                     {% if (library.media_type == 'movie' and arr.kind == 'radarr') or (library.media_type == 'show' and arr.kind == 'sonarr') %}
                       <option value="{{ arr.id }}" {% if library.arr_server_id == arr.id %}selected{% endif %}>{{ arr.name }}</option>
@@ -286,12 +285,12 @@
               </div>
             </form>
           {% else %}
-            <div class="text-sm text-emerald-200/60">No libraries discovered yet.</div>
+            <div class="text-sm text-emerald-200/60">{{ t('servers.empty.no_libraries', default='No libraries discovered yet.') }}</div>
           {% endfor %}
         </div>
       </div>
     {% else %}
-      <div class="panel text-sm text-emerald-200/60">No Plex server configured yet.</div>
+      <div class="panel text-sm text-emerald-200/60">{{ t('servers.empty.no_servers', default='No Plex server configured yet.') }}</div>
     {% endfor %}
   </div>
 </div>
@@ -358,4 +357,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+
 {% endblock %}

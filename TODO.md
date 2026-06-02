@@ -128,14 +128,14 @@ This file now focuses on what is still missing or worth improving, instead of ke
 ## Multilangue
 - [ ] controle du multilangue et rajout dans le json du manquant
 	- [x] socle i18n JSON + choix de langue + mode auto navigateur
-	- [ ] base layout + settings
+	- [x] base layout + settings
 	- [ ] dashboard
 	- [ ] people
 	- [ ] person detail
 	- [ ] arr + missing titles
-	- [ ] jobs + logs
-	- [ ] servers
+	- [x] jobs + logs
+	- [x] servers
 	
 ## backup
-- [ ] backup in wrong folder (doesn't display in /appdata/backups)
-- [ ] not displaying already done backups
+- [x] backup in wrong folder (doesn't display in /appdata/backups)
+- [x] not displaying already done backups

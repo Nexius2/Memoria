@@ -27,6 +27,85 @@
       "copied": "Copié"
     }
   },
+  "servers": {
+    "add": {
+      "title": "Ajouter un serveur Plex"
+    },
+    "edit": {
+      "title": "Modifier le serveur Plex"
+    },
+    "fields": {
+      "name": "Nom *",
+      "base_url": "URL de base *",
+      "token": "Token",
+      "token_required": "Token *",
+      "verify_ssl": "Vérifier SSL",
+      "enabled": "Activé"
+    },
+    "actions": {
+      "add_server": "Ajouter le serveur",
+      "save_server": "Enregistrer le serveur Plex",
+      "discover_libraries": "Découvrir les bibliothèques",
+      "refresh_cache": "Rafraîchir le cache Plex",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "delete": {
+      "title": "Supprimer le serveur Plex",
+      "message": "Es-tu sûr de vouloir supprimer le serveur Plex '{name}' ? Les associations de bibliothèques découvertes seront aussi supprimées.",
+      "button": "Supprimer le serveur Plex"
+    },
+    "info": {
+      "cache_help": "Les bibliothèques activées conservent un index local des titres Plex utilisé par le scan automatique des titres manquants. Le cache est rafraîchi par le scheduler, ce qui évite de relire toute la bibliothèque Plex à chaque scan d’une personne."
+    },
+    "cache": {
+      "ready": "Cache Plex prêt",
+      "error": "Erreur du cache Plex",
+      "pending": "Cache Plex en attente"
+    },
+    "library": {
+      "enabled": "Activée",
+      "home": "Accueil",
+      "friends_home": "Accueil des amis",
+      "arr_mapping": "Association Arr",
+      "none": "Aucune"
+    },
+    "empty": {
+      "no_libraries": "Aucune bibliothèque découverte pour le moment.",
+      "no_servers": "Aucun serveur Plex configuré pour le moment."
+    }
+  },
+"dashboard": {
+  "sections": {
+    "people_missing_titles": "Personnes avec le plus de titres manquants",
+    "manual_review": "Candidats nécessitant une validation manuelle",
+    "failed_scans": "Personnes avec des scans échoués",
+    "live_control": "Contrôle en direct",
+    "recent_candidates": "Derniers candidats web"
+  },
+  "actions": {
+    "open_missing_titles": "Ouvrir les titres manquants",
+    "see_titles": "Voir les titres",
+    "open_review_queue": "Ouvrir la file de validation",
+    "run_detection": "Lancer la détection",
+    "run_sync": "Lancer la synchronisation",
+    "sync_plex": "Synchroniser avec Plex",
+    "run_expire": "Lancer l’expiration",
+    "open_history": "Ouvrir l’historique"
+  },
+  "scan": {
+    "error": "Erreur de scan",
+    "pending": "Scan en attente",
+    "disabled": "Scan désactivé"
+  },
+  "labels": {
+    "death_date": "Date de décès",
+    "country": "Pays"
+  },
+  "recent_candidates": {
+    "help": "Candidats en cache triés par popularité puis par date de décès."
+  }
+},
   "settings": {
     "title": "Paramètres de l’application",
     "subtitle": "Toutes les modifications sont enregistrées automatiquement.",
@@ -39,6 +118,104 @@
       "auto": "Automatique (langue du navigateur)",
       "en": "Anglais",
       "fr": "Français"
+    },
+	"form": {
+      "tmdb_api_key": {
+        "label": "Clé API TMDb",
+        "help": "Utilisée pour améliorer la correspondance des filmographies et la détection des titres manquants."
+      },
+      "detection_window_days": {
+        "label": "Fenêtre de détection en jours *",
+        "help": "Nombre de jours récents analysés lors de la recherche de nouveaux décès."
+      },
+      "display_days": {
+        "label": "Jours d’affichage *",
+        "help": "Durée pendant laquelle un événement hommage et ses collections Plex restent actifs."
+      },
+      "max_people": {
+        "label": "Nombre maximum de personnes simultanées *",
+        "help": "Nombre maximum d’événements hommage créés à partir des candidats récents. Les candidats les plus populaires sont sélectionnés en premier."
+      },
+      "min_people_priority_display": {
+        "label": "Niveau minimum de priorité des personnes *",
+        "help": "Masque les candidats web à faible priorité du dashboard et de la page People, sauf s’ils sont épinglés, priorisés manuellement ou déjà actifs."
+      },
+      "log_retention_days": {
+        "label": "Rétention des logs en jours *",
+        "help": "Les logs applicatifs plus anciens que cette valeur sont supprimés automatiquement."
+      },
+      "job_retention_days": {
+        "label": "Rétention des tâches en jours *",
+        "help": "L’historique des détections et des tâches plus ancien que cette valeur est supprimé automatiquement."
+      },
+      "arr_activity_retention_days": {
+        "label": "Rétention de l’activité Arr en jours *",
+        "help": "L’historique des envois vers Arr plus ancien que cette valeur est supprimé automatiquement."
+      },
+      "missing_titles_refresh_hours": {
+        "label": "Rafraîchissement des titres manquants en heures *",
+        "help": "Fréquence à laquelle le scheduler rafraîchit le cache des films et séries manquants de chaque personne."
+      },
+      "backup_interval_hours": {
+        "label": "Intervalle des sauvegardes en heures *",
+        "help": "Fréquence maximale de création des sauvegardes automatiques de la base."
+      },
+      "backup_retention_count": {
+        "label": "Nombre de sauvegardes conservées *",
+        "help": "Nombre de fichiers de sauvegarde conservés avant suppression automatique des plus anciens."
+      },
+      "default_media_mode": {
+        "label": "Mode média par défaut *",
+        "both": "Films et séries",
+        "movie": "Films uniquement",
+        "show": "Séries uniquement",
+        "help": "Type de contenu ciblé par défaut lorsqu’un événement est créé automatiquement."
+      },
+      "countries": {
+        "label": "Pays",
+        "help": "Filtre de nationalité séparé par des virgules. Laisse vide pour rechercher tous les pays."
+      },
+      "professions": {
+        "label": "Professions",
+        "help": "Filtre de professions séparé par des virgules, par exemple : actor,actress,director."
+      },
+      "collection_name_template": {
+        "label": "Modèle de nom de collection *",
+        "help": "Utilisé lors de la création des collections Plex."
+      },
+      "collection_summary_template": {
+        "label": "Modèle de description de collection *",
+        "help": "Utilisé comme description de collection Plex."
+      },
+      "auto_detection_enabled": {
+        "label": "Activer la détection automatique web",
+        "help": "Autorise le scheduler à rafraîchir les candidats et à créer automatiquement les événements hommage. Les actions manuelles du dashboard restent disponibles même si cette option est désactivée."
+      },
+      "deduplicate_people": {
+        "label": "Dédupliquer les personnes",
+        "help": "Évite les doublons lorsqu’une même personne apparaît plusieurs fois dans les sources."
+      },
+      "auto_missing_titles_enabled": {
+        "label": "Activer le scan automatique des titres manquants",
+        "help": "Rafraîchit automatiquement en arrière-plan les films et séries manquants de chaque personne, sans ouvrir la fiche personne."
+      },
+      "auto_arr_enabled": {
+        "label": "Activer l’envoi automatique vers Arr",
+        "help": "Envoie automatiquement les films et séries manquants des événements hommage actifs vers les cibles Radarr / Sonarr liées."
+      },
+      "auto_backup_enabled": {
+        "label": "Activer la sauvegarde automatique de la base",
+        "help": "Crée des sauvegardes SQLite dans le dossier de sauvegarde configuré et conserve uniquement les fichiers les plus récents selon la rétention configurée."
+      },
+      "publish_on_home": {
+        "label": "Publier sur l’accueil (stocké)",
+        "help": "Préférence globale stockée par l’application et combinée avec le réglage de chaque bibliothèque."
+      },
+      "publish_on_friends_home": {
+        "label": "Publier sur l’accueil des amis (stocké)",
+        "help": "Préférence globale stockée par l’application et combinée avec le réglage de chaque bibliothèque."
+      },
+      "available_variables": "Variables disponibles :"
     },
     "backup": {
       "title": "Sauvegardes de la base",
@@ -70,6 +247,65 @@
       "restore": "Restaurer",
       "empty": "Aucune sauvegarde créée pour le moment.",
       "restore_confirm": "Restaurer cette sauvegarde et remplacer la base active ? Une sauvegarde de sécurité de la base actuelle sera créée d’abord."
+    }
+  },
+  "logs": {
+    "overview": {
+      "info": "Info",
+      "warnings": "Warnings",
+      "errors": "Erreurs",
+      "filtered_total": "Total filtré"
+    },
+    "filters": {
+      "title": "Filtres",
+      "subtitle": "Recherche par texte, niveau et date, puis filtres avancés uniquement si nécessaire.",
+      "rows_shown": "{count} lignes affichées",
+      "total": "{count} au total",
+      "current_page": "Page actuelle :",
+      "level": "Niveau",
+      "search": "Recherche",
+      "search_placeholder": "message ou détails",
+      "from": "Du",
+      "to": "Au",
+      "advanced": "Avancé",
+      "source": "Source",
+      "related": "Lié à",
+      "limit": "Limite"
+    },
+    "common": {
+      "all": "Tous",
+      "apply": "Appliquer",
+      "reset": "Réinitialiser"
+    },
+    "levels": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Erreur"
+    },
+    "related": {
+      "person": "Personne",
+      "event": "Événement",
+      "task_run": "Exécution de tâche",
+      "detection_run": "Détection",
+      "arr_activity": "Activité Arr",
+      "server": "Serveur",
+      "none": "Aucun objet lié"
+    },
+    "actions": {
+      "export_csv": "Exporter CSV",
+      "show_more": "Afficher plus",
+      "show_less": "Afficher moins"
+    },
+    "empty": {
+      "title": "Aucun log trouvé",
+      "message": "Aucun log ne correspond aux filtres actuels. Élargis la plage de dates, retire le filtre source ou lance une nouvelle action.",
+      "action": "Réinitialiser les filtres"
+    },
+    "pagination": {
+      "rows_one": "{total} ligne au total · page {page} / {total_pages}",
+      "rows_many": "{total} lignes au total · page {page} / {total_pages}",
+      "previous": "Précédent",
+      "next": "Suivant"
     }
   },
   "dashboard": {

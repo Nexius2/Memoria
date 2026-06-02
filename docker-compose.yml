@@ -10,6 +10,7 @@ services:
       TZ: Europe/Paris
       SECRET_KEY: change-me-with-a-long-random-secret
       DATABASE_PATH: /data/memoria.db
+      BACKUP_PATH: /data/backups
       SCHEDULER_ENABLED: "1"
     volumes:
       - ./data:/data

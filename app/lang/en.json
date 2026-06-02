@@ -27,6 +27,85 @@
       "copied": "Copied"
     }
   },
+  "servers": {
+    "add": {
+      "title": "Add Plex server"
+    },
+    "edit": {
+      "title": "Edit Plex server"
+    },
+    "fields": {
+      "name": "Name *",
+      "base_url": "Base URL *",
+      "token": "Token",
+      "token_required": "Token *",
+      "verify_ssl": "Verify SSL",
+      "enabled": "Enabled"
+    },
+    "actions": {
+      "add_server": "Add server",
+      "save_server": "Save Plex server",
+      "discover_libraries": "Discover libraries",
+      "refresh_cache": "Refresh Plex cache",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "delete": {
+      "title": "Delete Plex server",
+      "message": "Are you sure you want to delete the Plex server '{name}'? Its discovered library mappings will also be removed.",
+      "button": "Delete Plex server"
+    },
+    "info": {
+      "cache_help": "Enabled libraries keep a cached Plex title index used by the automatic missing titles scan. The cache is refreshed by the scheduler, so people scans do not need to re-read the whole Plex library every time."
+    },
+    "cache": {
+      "ready": "Plex cache ready",
+      "error": "Plex cache error",
+      "pending": "Plex cache pending"
+    },
+    "library": {
+      "enabled": "Enabled",
+      "home": "Home",
+      "friends_home": "Friends home",
+      "arr_mapping": "Arr mapping",
+      "none": "None"
+    },
+    "empty": {
+      "no_libraries": "No libraries discovered yet.",
+      "no_servers": "No Plex server configured yet."
+    }
+  },
+"dashboard": {
+  "sections": {
+    "people_missing_titles": "People with most missing titles",
+    "manual_review": "Candidates needing manual review",
+    "failed_scans": "People with failed scans",
+    "live_control": "Live control",
+    "recent_candidates": "Recent web candidates"
+  },
+  "actions": {
+    "open_missing_titles": "Open missing titles",
+    "see_titles": "See titles",
+    "open_review_queue": "Open review queue",
+    "run_detection": "Run detection",
+    "run_sync": "Run sync",
+    "sync_plex": "Sync with Plex",
+    "run_expire": "Run expire",
+    "open_history": "Open history"
+  },
+  "scan": {
+    "error": "Scan error",
+    "pending": "Scan pending",
+    "disabled": "Scan disabled"
+  },
+  "labels": {
+    "death_date": "Death date",
+    "country": "Country"
+  },
+  "recent_candidates": {
+    "help": "Cached candidates ordered by popularity, then by death date."
+  }
+},
   "settings": {
     "title": "Application settings",
     "subtitle": "All changes are saved automatically.",
@@ -39,6 +118,104 @@
       "auto": "Automatic (browser language)",
       "en": "English",
       "fr": "French"
+    },
+    "form": {
+      "tmdb_api_key": {
+        "label": "TMDb API key",
+        "help": "Used to improve filmography matching and missing titles detection."
+      },
+      "detection_window_days": {
+        "label": "Detection window days *",
+        "help": "How many recent days are scanned when looking for newly deceased people."
+      },
+      "display_days": {
+        "label": "Display days *",
+        "help": "How long a tribute event and its Plex collections stay active."
+      },
+      "max_people": {
+        "label": "Max simultaneous people *",
+        "help": "Maximum number of tribute events created from recent candidates. Most popular candidates are selected first."
+      },
+      "min_people_priority_display": {
+        "label": "Minimum people priority level *",
+        "help": "Hide low-priority web candidates from the dashboard and People page unless they are pinned, manually prioritized, or already active."
+      },
+      "log_retention_days": {
+        "label": "Log retention days *",
+        "help": "Application logs older than this are deleted automatically."
+      },
+      "job_retention_days": {
+        "label": "Job retention days *",
+        "help": "Detection and task history older than this are deleted automatically."
+      },
+      "arr_activity_retention_days": {
+        "label": "Arr activity retention days *",
+        "help": "Arr push history older than this is deleted automatically."
+      },
+      "missing_titles_refresh_hours": {
+        "label": "Missing titles refresh hours *",
+        "help": "How often the background scheduler refreshes each person missing movies and shows cache."
+      },
+      "backup_interval_hours": {
+        "label": "Backup interval hours *",
+        "help": "How often automatic database backups may be created."
+      },
+      "backup_retention_count": {
+        "label": "Backup retention count *",
+        "help": "How many backup files are kept before older ones are pruned automatically."
+      },
+      "default_media_mode": {
+        "label": "Default media mode *",
+        "both": "Both",
+        "movie": "Movies only",
+        "show": "Shows only",
+        "help": "Default target content when an event is created automatically."
+      },
+      "countries": {
+        "label": "Countries",
+        "help": "Comma-separated nationality filter. Leave empty to search all countries."
+      },
+      "professions": {
+        "label": "Professions",
+        "help": "Comma-separated occupations filter, for example: actor,actress,director."
+      },
+      "collection_name_template": {
+        "label": "Collection name template *",
+        "help": "Used when creating Plex collections."
+      },
+      "collection_summary_template": {
+        "label": "Collection summary template *",
+        "help": "Used as the Plex collection description."
+      },
+      "auto_detection_enabled": {
+        "label": "Enable web auto-detection",
+        "help": "Allows the background scheduler to refresh candidates and create tribute events automatically. Manual dashboard actions still work even if this is disabled."
+      },
+      "deduplicate_people": {
+        "label": "Deduplicate people",
+        "help": "Avoids duplicate entries when the same person appears multiple times in source results."
+      },
+      "auto_missing_titles_enabled": {
+        "label": "Enable automatic missing titles scan",
+        "help": "Refreshes each person missing movies and shows in background automatically, without opening the person page."
+      },
+      "auto_arr_enabled": {
+        "label": "Enable automatic Arr push",
+        "help": "Automatically sends missing movies and shows for active tribute events to linked Radarr / Sonarr targets."
+      },
+      "auto_backup_enabled": {
+        "label": "Enable automatic database backup",
+        "help": "Creates SQLite backups in the configured backup folder and keeps only the newest files according to the configured retention count."
+      },
+      "publish_on_home": {
+        "label": "Publish on home (stored)",
+        "help": "Global preference stored by the app and combined with each library setting."
+      },
+      "publish_on_friends_home": {
+        "label": "Publish on friends home (stored)",
+        "help": "Global preference stored by the app and combined with each library setting."
+      },
+      "available_variables": "Available variables:"
     },
     "backup": {
       "title": "Database backups",
@@ -70,6 +247,65 @@
       "restore": "Restore",
       "empty": "No backup created yet.",
       "restore_confirm": "Restore this backup and replace the active database? A safety backup of the current database will be created first."
+    }
+  },
+  "logs": {
+    "overview": {
+      "info": "Info",
+      "warnings": "Warnings",
+      "errors": "Errors",
+      "filtered_total": "Filtered total"
+    },
+    "filters": {
+      "title": "Filters",
+      "subtitle": "Search text, narrow quickly by level and date, then open advanced filters only when needed.",
+      "rows_shown": "{count} rows shown",
+      "total": "{count} total",
+      "current_page": "Current page:",
+      "level": "Level",
+      "search": "Search",
+      "search_placeholder": "message or details",
+      "from": "From",
+      "to": "To",
+      "advanced": "Advanced",
+      "source": "Source",
+      "related": "Related",
+      "limit": "Limit"
+    },
+    "common": {
+      "all": "All",
+      "apply": "Apply",
+      "reset": "Reset"
+    },
+    "levels": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "related": {
+      "person": "Person",
+      "event": "Event",
+      "task_run": "Task run",
+      "detection_run": "Detection run",
+      "arr_activity": "Arr activity",
+      "server": "Server",
+      "none": "No related object"
+    },
+    "actions": {
+      "export_csv": "Export CSV",
+      "show_more": "Show more",
+      "show_less": "Show less"
+    },
+    "empty": {
+      "title": "No logs found",
+      "message": "No log matches the current filters. Try broadening the date range, clearing the source filter, or waiting for a new action to generate fresh entries.",
+      "action": "Reset filters"
+    },
+    "pagination": {
+      "rows_one": "{total} row total · page {page} / {total_pages}",
+      "rows_many": "{total} rows total · page {page} / {total_pages}",
+      "previous": "Previous",
+      "next": "Next"
     }
   },
   "dashboard": {

@@ -964,6 +964,13 @@ def dashboard():
         .first()
     )
 
+    expire_run = (
+        TaskRun.query
+        .filter_by(task_type='expire')
+        .order_by(TaskRun.created_at.desc())
+        .first()
+    )
+
     latest_expire_run = (
         TaskRun.query
         .filter_by(task_type='expire')

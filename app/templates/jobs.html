@@ -1,60 +1,58 @@
 {% extends 'base.html' %}
 {% block content %}
 
-
-
 <div class="panel">
   <form method="get" action="{{ url_for('main.jobs') }}" class="filter-toolbar">
     <div class="filter-toolbar-header">
       <div>
-        <div class="filter-toolbar-title">Filters</div>
-        <div class="filter-toolbar-subtitle">Refine job history without mixing filters and data actions.</div>
+        <div class="filter-toolbar-title">{{ t('jobs.filters.title', default='Filters') }}</div>
+        <div class="filter-toolbar-subtitle">{{ t('jobs.filters.subtitle', default='Refine job history without mixing filters and data actions.') }}</div>
       </div>
-		  <div>
-			  <div class="text-xs text-emerald-200/60">
-			  {{ job_rows|length }} row{{ 's' if job_rows|length != 1 else '' }} shown
-			  </div>
-			  <div class="filter-toolbar-meta">
-				Current page: {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
-			  </div>
-		</div>
+      <div>
+        <div class="text-xs text-emerald-200/60">
+          {{ t('jobs.filters.rows_shown', default='{count} rows shown', count=job_rows|length) }}
+        </div>
+        <div class="filter-toolbar-meta">
+          {{ t('common.current_page', default='Current page:') }} {{ page }}{% if total_pages %} / {{ total_pages }}{% endif %}
+        </div>
+      </div>
     </div>
 
     <div class="filter-toolbar-grid cols-6">
       <div>
-        <label class="field-label">Job type</label>
+        <label class="field-label">{{ t('jobs.filters.job_type', default='Job type') }}</label>
         <select class="field" name="job_type">
-          <option value="all" {% if job_type == 'all' %}selected{% endif %}>All</option>
-          <option value="detection" {% if job_type == 'detection' %}selected{% endif %}>Detection</option>
-          <option value="sync" {% if job_type == 'sync' %}selected{% endif %}>Sync</option>
-          <option value="expire" {% if job_type == 'expire' %}selected{% endif %}>Expire</option>
-          <option value="cleanup" {% if job_type == 'cleanup' %}selected{% endif %}>Cleanup</option>
+          <option value="all" {% if job_type == 'all' %}selected{% endif %}>{{ t('common.all', default='All') }}</option>
+          <option value="detection" {% if job_type == 'detection' %}selected{% endif %}>{{ t('jobs.types.detection', default='Detection') }}</option>
+          <option value="sync" {% if job_type == 'sync' %}selected{% endif %}>{{ t('jobs.types.sync', default='Sync') }}</option>
+          <option value="expire" {% if job_type == 'expire' %}selected{% endif %}>{{ t('jobs.types.expire', default='Expire') }}</option>
+          <option value="cleanup" {% if job_type == 'cleanup' %}selected{% endif %}>{{ t('jobs.types.cleanup', default='Cleanup') }}</option>
         </select>
       </div>
 
       <div>
-        <label class="field-label">Status</label>
+        <label class="field-label">{{ t('jobs.filters.status', default='Status') }}</label>
         <select class="field" name="status">
-          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
-          <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
-          <option value="running" {% if status_filter == 'running' %}selected{% endif %}>Running</option>
-          <option value="success" {% if status_filter == 'success' %}selected{% endif %}>Success</option>
-          <option value="error" {% if status_filter == 'error' %}selected{% endif %}>Error</option>
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>{{ t('common.all', default='All') }}</option>
+          <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>{{ t('jobs.status.pending', default='Pending') }}</option>
+          <option value="running" {% if status_filter == 'running' %}selected{% endif %}>{{ t('jobs.status.running', default='Running') }}</option>
+          <option value="success" {% if status_filter == 'success' %}selected{% endif %}>{{ t('jobs.status.success', default='Success') }}</option>
+          <option value="error" {% if status_filter == 'error' %}selected{% endif %}>{{ t('jobs.status.error', default='Error') }}</option>
         </select>
       </div>
 
       <div>
-        <label class="field-label">From</label>
+        <label class="field-label">{{ t('common.from', default='From') }}</label>
         <input type="date" class="field" name="date_from" value="{{ date_from }}">
       </div>
 
       <div>
-        <label class="field-label">To</label>
+        <label class="field-label">{{ t('common.to', default='To') }}</label>
         <input type="date" class="field" name="date_to" value="{{ date_to }}">
       </div>
 
       <div>
-        <label class="field-label">Limit</label>
+        <label class="field-label">{{ t('common.limit', default='Limit') }}</label>
         <select class="field" name="limit">
           <option value="10" {% if limit == 10 %}selected{% endif %}>10</option>
           <option value="20" {% if limit == 20 %}selected{% endif %}>20</option>
@@ -66,8 +64,8 @@
       </div>
 
       <div class="filter-toolbar-actions">
-        <button type="submit" class="btn-primary">Apply</button>
-        <a href="{{ url_for('main.jobs') }}" class="btn-secondary">Reset</a>
+        <button type="submit" class="btn-primary">{{ t('common.apply', default='Apply') }}</button>
+        <a href="{{ url_for('main.jobs') }}" class="btn-secondary">{{ t('common.reset', default='Reset') }}</a>
       </div>
     </div>
   </form>
@@ -76,28 +74,28 @@
     <table class="w-full text-sm">
       <thead>
         <tr class="text-left text-emerald-200/70 border-b border-emerald-400/10">
-          <th class="py-3 pr-4">Created</th>
-          <th class="py-3 pr-4">Type</th>
-          <th class="py-3 pr-4">Status</th>
-          <th class="py-3 pr-4">Requested by</th>
-          <th class="py-3 pr-4">Window</th>
-          <th class="py-3 pr-4">Duration</th>
-          <th class="py-3 pr-4">Summary</th>
-          <th class="py-3">Details</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.created', default='Created') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.type', default='Type') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.status', default='Status') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.requested_by', default='Requested by') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.window', default='Window') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.duration', default='Duration') }}</th>
+          <th class="py-3 pr-4">{{ t('jobs.table.summary', default='Summary') }}</th>
+          <th class="py-3">{{ t('jobs.table.details', default='Details') }}</th>
         </tr>
       </thead>
       <tbody>
         {% for row in job_rows %}
           <tr class="border-b border-emerald-400/5 align-top">
             <td class="py-3 pr-4 whitespace-nowrap text-emerald-100/80">
-			<div>
-			  <span
-				data-local-datetime="{{ row.created_at|datetime_utc_iso if row.created_at else '' }}"
-				data-local-datetime-seconds="1"
-			  >
-				{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
-			  </span>
-			</div>
+              <div>
+                <span
+                  data-local-datetime="{{ row.created_at|datetime_utc_iso if row.created_at else '' }}"
+                  data-local-datetime-seconds="1"
+                >
+                  {{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '—' }}
+                </span>
+              </div>
               <div class="text-[11px] text-emerald-200/50">
                 #{{ row.id }}
               </div>
@@ -126,22 +124,22 @@
 
             <td class="py-3 pr-4 text-emerald-100/70 whitespace-nowrap">
               <div>
-                <span class="text-emerald-200/50">Start:</span>
+                <span class="text-emerald-200/50">{{ t('jobs.table.start', default='Start:') }}</span>
                 <span
-				  data-local-datetime="{{ row.started_at|datetime_utc_iso if row.started_at else '' }}"
-				  data-local-datetime-seconds="1"
-				>
-				  {{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '—' }}
-				</span>
+                  data-local-datetime="{{ row.started_at|datetime_utc_iso if row.started_at else '' }}"
+                  data-local-datetime-seconds="1"
+                >
+                  {{ row.started_at.strftime('%Y-%m-%d %H:%M:%S') if row.started_at else '—' }}
+                </span>
               </div>
               <div>
-                <span class="text-emerald-200/50">End:</span>
+                <span class="text-emerald-200/50">{{ t('jobs.table.end', default='End:') }}</span>
                 <span
-				  data-local-datetime="{{ row.finished_at|datetime_utc_iso if row.finished_at else '' }}"
-				  data-local-datetime-seconds="1"
-				>
-				  {{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '—' }}
-				</span>
+                  data-local-datetime="{{ row.finished_at|datetime_utc_iso if row.finished_at else '' }}"
+                  data-local-datetime-seconds="1"
+                >
+                  {{ row.finished_at.strftime('%Y-%m-%d %H:%M:%S') if row.finished_at else '—' }}
+                </span>
               </div>
             </td>
 
@@ -149,7 +147,7 @@
               {% if row.duration_seconds is not none %}
                 {{ row.duration_seconds }}s
               {% elif row.status in ['pending', 'running'] %}
-                running...
+                {{ t('jobs.status.running_ellipsis', default='running...') }}
               {% else %}
                 —
               {% endif %}
@@ -167,10 +165,10 @@
           <tr>
             <td colspan="8" class="py-6">
               {% set empty_state_icon = '🛠' %}
-              {% set empty_state_title = 'No jobs found' %}
-              {% set empty_state_message = 'No background job matches the current filters. Try resetting the filters or launch a new detection, sync or expire action from the dashboard.' %}
+              {% set empty_state_title = t('jobs.empty.title', default='No jobs found') %}
+              {% set empty_state_message = t('jobs.empty.message', default='No background job matches the current filters. Try resetting the filters or launch a new detection, sync or expire action from the dashboard.') %}
               {% set empty_state_action_url = url_for('main.dashboard') %}
-              {% set empty_state_action_label = 'Open dashboard' %}
+              {% set empty_state_action_label = t('jobs.empty.action', default='Open dashboard') %}
               {% include '_empty_state.html' %}
             </td>
           </tr>
@@ -181,7 +179,7 @@
 
   <div class="list-page-footer">
     <div class="list-page-footer-meta">
-      {{ total_rows }} row{{ 's' if total_rows != 1 else '' }} total · page {{ page }} / {{ total_pages }}
+      {{ t('common.rows_total_page', default='{total} rows total · page {page} / {total_pages}', total=total_rows, page=page, total_pages=total_pages) }}
     </div>
 
     <div class="list-page-footer-actions">
@@ -190,10 +188,10 @@
           href="{{ url_for('main.jobs', page=prev_page, limit=limit, job_type=job_type, status=status_filter, date_from=date_from, date_to=date_to) }}"
           class="btn-secondary"
         >
-          Previous
+          {{ t('common.previous', default='Previous') }}
         </a>
       {% else %}
-        <span class="btn-secondary opacity-40 pointer-events-none">Previous</span>
+        <span class="btn-secondary opacity-40 pointer-events-none">{{ t('common.previous', default='Previous') }}</span>
       {% endif %}
 
       {% if has_next %}
@@ -201,10 +199,10 @@
           href="{{ url_for('main.jobs', page=next_page, limit=limit, job_type=job_type, status=status_filter, date_from=date_from, date_to=date_to) }}"
           class="btn-secondary"
         >
-          Next
+          {{ t('common.next', default='Next') }}
         </a>
       {% else %}
-        <span class="btn-secondary opacity-40 pointer-events-none">Next</span>
+        <span class="btn-secondary opacity-40 pointer-events-none">{{ t('common.next', default='Next') }}</span>
       {% endif %}
     </div>
   </div>

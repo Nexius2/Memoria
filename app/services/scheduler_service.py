@@ -240,6 +240,17 @@ def run_startup_catchup(app) -> None:
             details=str(exc),
         )
 
+    try:
+        run_scheduled_backup()
+    except Exception as exc:
+        current_app.logger.exception('Startup catch-up failed during database backup.')
+        log_app_event(
+            'error',
+            'scheduler',
+            'Startup catch-up failed during database backup.',
+            details=str(exc),
+        )
+
     log_app_event(
         'info',
         'scheduler',
